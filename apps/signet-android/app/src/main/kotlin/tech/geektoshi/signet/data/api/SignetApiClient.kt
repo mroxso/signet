@@ -151,7 +151,9 @@ class SignetApiClient(
      * Revoke an app
      */
     suspend fun revokeApp(id: Int): OperationResponse {
-        return client.post("/apps/$id/revoke").body()
+        return client.post("/apps/$id/revoke") {
+            setBody(emptyMap<String, String>())
+        }.body()
     }
 
     /**

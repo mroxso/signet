@@ -175,6 +175,7 @@ function AppContent() {
             onViewDetails={setDetailsModalRequest}
             onNavigateToActivity={() => setActiveNav('activity')}
             onNavigateToKeys={() => setActiveNav('keys')}
+            onNavigateToApps={() => setActiveNav('apps')}
             onToggleShowAutoApproved={() => setShowAutoApproved(prev => !prev)}
           />
         );

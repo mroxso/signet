@@ -1,7 +1,10 @@
 package tech.geektoshi.signet.ui.screens.setup
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +20,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -32,10 +36,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import tech.geektoshi.signet.R
+import tech.geektoshi.signet.data.api.SignetApiClient
 import tech.geektoshi.signet.data.repository.SettingsRepository
 import tech.geektoshi.signet.ui.theme.BgSecondary
 import tech.geektoshi.signet.ui.theme.BgTertiary
@@ -51,9 +58,11 @@ fun SetupScreen(
     settingsRepository: SettingsRepository,
     onSetupComplete: () -> Unit
 ) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var daemonUrl by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+    var isConnecting by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -112,7 +121,7 @@ fun SetupScreen(
                 )
 
                 Text(
-                    text = "Enter your Signet server URL",
+                    text = "Manage signing requests from your Signet daemon. Enter the URL where your server is running.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = TextSecondary
                 )
@@ -126,6 +135,7 @@ fun SetupScreen(
                     label = { Text("Server URL") },
                     placeholder = { Text("http://192.168.1.x:3000") },
                     singleLine = true,
+                    enabled = !isConnecting,
                     isError = error != null,
                     supportingText = error?.let { { Text(it) } },
                     modifier = Modifier.fillMaxWidth(),
@@ -158,19 +168,56 @@ fun SetupScreen(
                             return@Button
                         }
                         scope.launch {
-                            settingsRepository.setDaemonUrl(url)
-                            onSetupComplete()
+                            isConnecting = true
+                            error = null
+                            try {
+                                val client = SignetApiClient(url)
+                                val reachable = client.healthCheck()
+                                client.close()
+                                if (reachable) {
+                                    settingsRepository.setDaemonUrl(url)
+                                    onSetupComplete()
+                                } else {
+                                    error = "Could not reach server. Check the URL and make sure Signet is running."
+                                }
+                            } catch (e: Exception) {
+                                error = "Connection failed: ${e.message ?: "Unknown error"}"
+                            } finally {
+                                isConnecting = false
+                            }
                         }
                     },
+                    enabled = !isConnecting,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = SignetPurple,
                         contentColor = TextPrimary
                     )
                 ) {
-                    Text("Connect")
+                    if (isConnecting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = TextPrimary,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text("Connect")
+                    }
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text(
+            text = "Need help getting started?",
+            style = MaterialTheme.typography.bodyMedium,
+            color = SignetPurple,
+            textDecoration = TextDecoration.Underline,
+            modifier = Modifier.clickable {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Letdown2491/signet"))
+                context.startActivity(intent)
+            }
+        )
     }
 }

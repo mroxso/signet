@@ -48,6 +48,7 @@ import tech.geektoshi.signet.data.repository.EventBusRepository
 import tech.geektoshi.signet.data.repository.SettingsRepository
 import tech.geektoshi.signet.ui.components.BadgeStatus
 import tech.geektoshi.signet.ui.components.EmptyState
+import tech.geektoshi.signet.ui.components.RelayDetailSheet
 import tech.geektoshi.signet.ui.components.RequestDetailSheet
 import tech.geektoshi.signet.ui.components.SkeletonActivityCard
 import tech.geektoshi.signet.ui.components.SkeletonRequestCard
@@ -69,7 +70,8 @@ import tech.geektoshi.signet.util.getMethodLabelPastTense
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    onNavigateToKeys: () -> Unit = {}
+    onNavigateToKeys: () -> Unit = {},
+    onNavigateToApps: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val settingsRepository = remember { SettingsRepository(context) }
@@ -82,6 +84,7 @@ fun HomeScreen(
     var pendingRequests by remember { mutableStateOf<List<PendingRequest>>(emptyList()) }
     var relays by remember { mutableStateOf<RelaysResponse?>(null) }
     var selectedRequest by remember { mutableStateOf<PendingRequest?>(null) }
+    var showRelaySheet by remember { mutableStateOf(false) }
     var refreshCounter by remember { mutableIntStateOf(0) }
     val defaultTrustLevel by settingsRepository.defaultTrustLevel.collectAsState(initial = "reasonable")
     val eventBus = remember { EventBusRepository.getInstance() }
@@ -94,20 +97,15 @@ fun HomeScreen(
     }
 
     // Subscribe to SSE events for real-time updates
+    // The backend emits stats:updated for ALL stat-changing events,
+    // so we just replace stats entirely when we receive it
     LaunchedEffect(Unit) {
         eventBus.events.collect { event ->
             when (event) {
                 is ServerEvent.RequestCreated -> {
                     // Add new request to pending list
+                    // Stats will be updated via StatsUpdated event
                     pendingRequests = listOf(event.request) + pendingRequests
-                    // Update stats - increment pending count
-                    dashboard?.stats?.let { currentStats ->
-                        dashboard = dashboard?.copy(
-                            stats = currentStats.copy(
-                                pendingRequests = currentStats.pendingRequests + 1
-                            )
-                        )
-                    }
                 }
                 is ServerEvent.RequestApproved -> {
                     // Remove from pending list
@@ -123,16 +121,8 @@ fun HomeScreen(
                     pendingRequests = pendingRequests.filter { it.id != event.requestId }
                 }
                 is ServerEvent.StatsUpdated -> {
-                    // Update dashboard stats from SSE
-                    dashboard?.stats?.let { currentStats ->
-                        dashboard = dashboard?.copy(
-                            stats = currentStats.copy(
-                                pendingRequests = event.stats.pendingRequests,
-                                totalKeys = event.stats.totalKeys,
-                                connectedApps = event.stats.connectedApps
-                            )
-                        )
-                    }
+                    // Backend sends fresh stats for all stat changes - just replace entirely
+                    dashboard = dashboard?.copy(stats = event.stats)
                 }
                 is ServerEvent.AppConnected, is ServerEvent.AppRevoked -> {
                     // Refresh to get updated app count
@@ -156,6 +146,16 @@ fun HomeScreen(
             onDismiss = { selectedRequest = null },
             onActionComplete = { refreshCounter++ }
         )
+    }
+
+    // Show relay status sheet
+    if (showRelaySheet) {
+        relays?.let { relayData ->
+            RelayDetailSheet(
+                relays = relayData,
+                onDismiss = { showRelaySheet = false }
+            )
+        }
     }
 
     LaunchedEffect(daemonUrl, refreshCounter) {
@@ -268,19 +268,24 @@ fun HomeScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 StatCard(
-                    title = "Keys",
-                    value = dashboard?.stats?.totalKeys?.toString() ?: "0",
-                    modifier = Modifier.weight(1f)
+                    title = "Active Keys",
+                    value = dashboard?.stats?.let {
+                        if (it.totalKeys == 0) "0" else "${it.activeKeys}/${it.totalKeys}"
+                    } ?: "-",
+                    modifier = Modifier.weight(1f),
+                    onClick = onNavigateToKeys
                 )
                 StatCard(
                     title = "Apps",
                     value = dashboard?.stats?.connectedApps?.toString() ?: "0",
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    onClick = onNavigateToApps
                 )
                 StatCard(
                     title = "Relays",
                     value = relays?.let { "${it.connected}/${it.total}" } ?: "-",
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    onClick = { relays?.let { showRelaySheet = true } }
                 )
             }
         }
@@ -352,10 +357,15 @@ private fun StatCard(
     title: String,
     value: String,
     modifier: Modifier = Modifier,
-    highlight: Boolean = false
+    highlight: Boolean = false,
+    onClick: (() -> Unit)? = null
 ) {
     Card(
-        modifier = modifier,
+        modifier = if (onClick != null) {
+            modifier.pressScale(onClick = onClick)
+        } else {
+            modifier
+        },
         colors = CardDefaults.cardColors(containerColor = BgSecondary)
     ) {
         Column(

@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { KeyService } from '../../services/index.js';
+import { emitCurrentStats } from '../../services/index.js';
 import type { PreHandlerFull } from '../types.js';
 import { sendError } from '../../lib/route-errors.js';
 
@@ -33,6 +34,9 @@ export function registerKeysRoutes(
                 nsec: body.nsec,
             });
 
+            // Emit stats update (key count changed)
+            await emitCurrentStats();
+
             return reply.send({ ok: true, key });
         } catch (error) {
             return sendError(reply, error);
@@ -50,6 +54,10 @@ export function registerKeysRoutes(
 
         try {
             await config.keyService.unlockKey(keyName, passphrase);
+
+            // Emit stats update (active key count changed)
+            await emitCurrentStats();
+
             return reply.send({ ok: true });
         } catch (error) {
             return sendError(reply, error);
@@ -97,6 +105,10 @@ export function registerKeysRoutes(
 
         try {
             const result = await config.keyService.deleteKey(keyName, passphrase);
+
+            // Emit stats update (key count and possibly app count changed)
+            await emitCurrentStats();
+
             return reply.send({
                 ok: true,
                 revokedApps: result.revokedApps,

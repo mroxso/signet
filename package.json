@@ -14,6 +14,8 @@
     "build:daemon": "npm run build --workspace signet",
     "build:new-ui": "npm run build --workspace signet-ui",
     "start:daemon": "npm run lfg --workspace signet",
-    "start:new-ui": "npm run dev --workspace signet-ui -- --host 0.0.0.0 --port 4174"
-  }
+    "start:new-ui": "npm run dev --workspace signet-ui -- --host 0.0.0.0 --port 4174",
+    "sync-version": "node scripts/sync-version.mjs"
+  },
+  "version": "1.1.0"
 }

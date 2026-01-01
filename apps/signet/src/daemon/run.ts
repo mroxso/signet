@@ -17,6 +17,8 @@ import {
     EventService,
     setEventService,
     getEventService,
+    setDashboardService,
+    emitCurrentStats,
 } from './services/index.js';
 import { requestRepository, logRepository } from './repositories/index.js';
 import { HttpServer } from './http/server.js';
@@ -153,6 +155,9 @@ async function logAutoApproval(
         appName: keyUser?.description ?? undefined,
         autoApproved,
     });
+
+    // Emit stats update (activity count changed)
+    await emitCurrentStats();
 }
 
 export async function runDaemon(config: DaemonBootstrapConfig): Promise<void> {
@@ -213,6 +218,7 @@ class Daemon {
             allKeys: config.allKeys,
             getActiveKeyCount: () => Object.keys(this.keyService.getActiveKeys()).length,
         });
+        setDashboardService(this.dashboardService);
 
         // Initialize event service for real-time updates
         this.eventService = new EventService();
@@ -260,12 +266,15 @@ class Daemon {
     }
 
     private async runCleanup(): Promise<void> {
+        let statsChanged = false;
+
         // Cleanup expired requests (older than 24 hours)
         try {
             const requestMaxAge = new Date(Date.now() - REQUEST_MAX_AGE_MS);
             const deletedRequests = await requestRepository.cleanupExpired(requestMaxAge);
             if (deletedRequests > 0) {
                 console.log(`Cleaned up ${deletedRequests} expired request(s) older than 24 hours`);
+                statsChanged = true;
             }
         } catch (error) {
             console.error('Failed to cleanup old requests:', error);
@@ -277,9 +286,15 @@ class Daemon {
             const deletedLogs = await logRepository.cleanupExpired(logMaxAge);
             if (deletedLogs > 0) {
                 console.log(`Cleaned up ${deletedLogs} log(s) older than 30 days`);
+                statsChanged = true;
             }
         } catch (error) {
             console.error('Failed to cleanup old logs:', error);
+        }
+
+        // Emit stats update if anything changed
+        if (statsChanged) {
+            await emitCurrentStats();
         }
     }
 

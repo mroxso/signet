@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { AppService } from '../../services/index.js';
+import { emitCurrentStats } from '../../services/index.js';
 import type { TrustLevel } from '@signet/types';
 import type { PreHandlerAuthCsrf } from '../types.js';
 import { sendError } from '../../lib/route-errors.js';
@@ -30,6 +31,10 @@ export function registerAppsRoutes(
 
         try {
             await config.appService.revokeApp(appId);
+
+            // Emit stats update (app count changed)
+            await emitCurrentStats();
+
             return reply.send({ ok: true });
         } catch (error) {
             return sendError(reply, error);

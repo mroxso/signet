@@ -4,7 +4,7 @@ import { permitAllRequests, grantPermissionsByTrustLevel, type TrustLevel } from
 import type { AllowScope } from '../lib/acl.js';
 import { sanitizeCallbackUrl } from '../lib/auth.js';
 import { getEventService } from '../services/event-service.js';
-import { appService } from '../services/index.js';
+import { appService, emitCurrentStats } from '../services/index.js';
 import { VALID_TRUST_LEVELS } from '../constants.js';
 
 const debug = createDebug('signet:web');
@@ -130,6 +130,9 @@ export async function processRequestWebHandler(
                 });
             }
         }
+
+        // Emit stats update (pending count and possibly app count changed)
+        await emitCurrentStats();
 
         reply.type('application/json');
         return reply.send({ ok: true, trustLevel });

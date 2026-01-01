@@ -45,6 +45,8 @@ export function useDashboard(): UseDashboardResult {
   }, [refresh]);
 
   // Subscribe to SSE events for real-time stats updates
+  // The backend emits stats:updated for ALL stat-changing events,
+  // so we just replace stats entirely when we receive it
   const handleSSEEvent = useCallback((event: ServerEvent) => {
     // Refresh data on reconnection to ensure consistency
     if (event.type === 'reconnected') {
@@ -52,45 +54,11 @@ export function useDashboard(): UseDashboardResult {
       return;
     }
 
-    // Handle stats updates
-    setStats(prev => {
-      if (!prev) return prev;
-
-      switch (event.type) {
-        case 'request:created':
-          return {
-            ...prev,
-            pendingRequests: prev.pendingRequests + 1,
-            recentActivity24h: prev.recentActivity24h + 1,
-          };
-        case 'request:approved':
-        case 'request:denied':
-        case 'request:expired':
-          return {
-            ...prev,
-            pendingRequests: Math.max(0, prev.pendingRequests - 1),
-          };
-        case 'request:auto_approved':
-          return {
-            ...prev,
-            recentActivity24h: prev.recentActivity24h + 1,
-          };
-        case 'app:connected':
-          return {
-            ...prev,
-            connectedApps: prev.connectedApps + 1,
-          };
-        case 'app:revoked':
-          return {
-            ...prev,
-            connectedApps: Math.max(0, prev.connectedApps - 1),
-          };
-        case 'stats:updated':
-          return event.stats;
-        default:
-          return prev;
-      }
-    });
+    // Handle stats:updated - backend sends fresh stats for all stat changes
+    if (event.type === 'stats:updated') {
+      setStats(event.stats);
+      return;
+    }
 
     // Handle activity updates for auto-approved requests
     if (event.type === 'request:auto_approved') {

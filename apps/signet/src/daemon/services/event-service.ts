@@ -1,5 +1,6 @@
 import createDebug from 'debug';
 import type { PendingRequest, ConnectedApp, DashboardStats, KeyInfo, RelayStatusResponse, ActivityEntry } from '@signet/types';
+import { getDashboardService } from './dashboard-service.js';
 
 const debug = createDebug('signet:events');
 
@@ -184,4 +185,20 @@ export function getEventService(): EventService {
 
 export function setEventService(service: EventService): void {
     eventServiceInstance = service;
+}
+
+/**
+ * Helper to fetch current stats and emit stats:updated event.
+ * Call this after any operation that changes dashboard stats.
+ */
+export async function emitCurrentStats(): Promise<void> {
+    try {
+        const dashboardService = getDashboardService();
+        const eventService = getEventService();
+        const stats = await dashboardService.getStats();
+        eventService.emitStatsUpdated(stats);
+    } catch (error) {
+        // Log but don't throw - stats emission is not critical
+        debug('Failed to emit current stats: %O', error);
+    }
 }

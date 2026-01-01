@@ -37,8 +37,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import tech.geektoshi.signet.data.api.ServerEvent
 import tech.geektoshi.signet.data.api.SignetApiClient
 import tech.geektoshi.signet.data.model.KeyInfo
+import tech.geektoshi.signet.data.repository.EventBusRepository
 import tech.geektoshi.signet.data.repository.SettingsRepository
 import tech.geektoshi.signet.ui.components.CreateKeySheet
 import tech.geektoshi.signet.ui.components.EmptyState
@@ -68,6 +70,31 @@ fun KeysScreen() {
     var selectedKey by remember { mutableStateOf<KeyInfo?>(null) }
     var showCreateKey by remember { mutableStateOf(false) }
     var refreshCounter by remember { mutableIntStateOf(0) }
+    val eventBus = remember { EventBusRepository.getInstance() }
+
+    // Connect to SSE when daemon URL is available
+    LaunchedEffect(daemonUrl) {
+        if (daemonUrl.isNotEmpty()) {
+            eventBus.connect(daemonUrl)
+        }
+    }
+
+    // Subscribe to SSE events for real-time updates
+    LaunchedEffect(Unit) {
+        eventBus.events.collect { event ->
+            when (event) {
+                is ServerEvent.KeyCreated,
+                is ServerEvent.KeyUnlocked,
+                is ServerEvent.KeyDeleted,
+                is ServerEvent.KeyRenamed,
+                is ServerEvent.KeyUpdated -> {
+                    // Refresh list on any key change
+                    refreshCounter++
+                }
+                else -> {}
+            }
+        }
+    }
 
     // Show create key sheet
     if (showCreateKey) {

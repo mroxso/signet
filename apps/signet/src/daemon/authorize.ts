@@ -2,7 +2,7 @@ import type { Event } from 'nostr-tools/pure';
 import createDebug from 'debug';
 import prisma from '../db.js';
 import type { ConnectionManager } from './connection-manager.js';
-import { getEventService } from './services/event-service.js';
+import { getEventService, emitCurrentStats } from './services/index.js';
 import { requestRepository } from './repositories/request-repository.js';
 import type { PendingRequest } from '@signet/types';
 import {
@@ -101,6 +101,9 @@ async function persistRequest(
         appName: record.KeyUser?.description ?? null,
     });
 
+    // Emit stats update (pending count increased)
+    await emitCurrentStats();
+
     // Schedule expiry notification - don't delete the record, keep for history
     const dbRecordId = record.id;
     setTimeout(async () => {
@@ -114,6 +117,8 @@ async function persistRequest(
             // Only emit expired event if request was never processed
             if (currentRecord && currentRecord.allowed === null) {
                 eventService.emitRequestExpired(dbRecordId);
+                // Emit stats update (pending count decreased)
+                await emitCurrentStats();
             }
         } catch (error) {
             debug(`Failed to check request expiry ${dbRecordId}: ${error}`);

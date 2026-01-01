@@ -20,6 +20,32 @@ export class DashboardService {
         this.config = config;
     }
 
+    /**
+     * Get just the dashboard stats (without activity or hourly data)
+     * Used for emitting stats:updated events
+     */
+    async getStats(): Promise<DashboardStats> {
+        const totalKeys = Object.keys(this.config.allKeys).length;
+        const activeKeys = this.config.getActiveKeyCount();
+
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        const [connectedApps, pendingRequests, recentActivity24h] = await Promise.all([
+            appRepository.countActive(),
+            requestRepository.countPending(),
+            logRepository.countSince(yesterday),
+        ]);
+
+        return {
+            totalKeys,
+            activeKeys,
+            connectedApps,
+            pendingRequests,
+            recentActivity24h,
+        };
+    }
+
     async getDashboardData(): Promise<DashboardData> {
         const totalKeys = Object.keys(this.config.allKeys).length;
         const activeKeys = this.config.getActiveKeyCount();
@@ -56,4 +82,18 @@ export class DashboardService {
             hourlyActivity,
         };
     }
+}
+
+// Singleton instance for global access
+let dashboardServiceInstance: DashboardService | null = null;
+
+export function getDashboardService(): DashboardService {
+    if (!dashboardServiceInstance) {
+        throw new Error('DashboardService not initialized. Call setDashboardService() first.');
+    }
+    return dashboardServiceInstance;
+}
+
+export function setDashboardService(service: DashboardService): void {
+    dashboardServiceInstance = service;
 }

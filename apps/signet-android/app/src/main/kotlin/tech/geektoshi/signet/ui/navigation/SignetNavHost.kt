@@ -101,6 +101,15 @@ fun SignetNavHost(settingsRepository: SettingsRepository) {
                             launchSingleTop = true
                             restoreState = true
                         }
+                    },
+                    onNavigateToApps = {
+                        navController.navigate(Screen.Apps.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
                     }
                 )
             }

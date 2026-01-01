@@ -7,15 +7,19 @@ name: Signet
 summary: NIP-46 remote signer for Nostr
 
 description: |
-  Signet is a NIP-46 remote signer that keeps your Nostr private keys
-  secure on your own server. Approve signing requests from any
-  connected app via the web dashboard or native Android app.
+  Keep your Nostr private keys secure on a server you control. When
+  apps need to sign events, Signet handles the request.
 
   Features:
-  - Trust levels for fine-grained permission control
-  - Real-time notifications for signing requests
+  - Real-time push notifications for signing requests
+  - Biometric or PIN lock for extra security
+  - Dashboard showing keys, connected apps, and relay status
+  - Full activity history of all signing requests
+  - Manage trust levels per app or event kind
   - AES-256-GCM key encryption at rest
-  - Works with any NIP-46 compatible client
+
+  Note: This is a companion app. You'll need a running Signet daemon.
+  See the project documentation to get started.
 
 license: MIT
 

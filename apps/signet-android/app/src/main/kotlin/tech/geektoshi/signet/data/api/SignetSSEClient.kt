@@ -1,5 +1,6 @@
 package tech.geektoshi.signet.data.api
 
+import tech.geektoshi.signet.data.model.DashboardStats
 import tech.geektoshi.signet.data.model.PendingRequest
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -57,15 +58,8 @@ sealed class ServerEvent {
     @Serializable
     data class StatsUpdated(
         val type: String = "stats:updated",
-        val stats: Stats
-    ) : ServerEvent() {
-        @Serializable
-        data class Stats(
-            val pendingRequests: Int = 0,
-            val totalKeys: Int = 0,
-            val connectedApps: Int = 0
-        )
-    }
+        val stats: DashboardStats
+    ) : ServerEvent()
 
     @Serializable
     data class AppConnected(val type: String = "app:connected") : ServerEvent()
@@ -74,6 +68,37 @@ sealed class ServerEvent {
     data class AppRevoked(
         val type: String = "app:revoked",
         val appId: Int
+    ) : ServerEvent()
+
+    @Serializable
+    data class AppUpdated(val type: String = "app:updated") : ServerEvent()
+
+    @Serializable
+    data class KeyCreated(val type: String = "key:created") : ServerEvent()
+
+    @Serializable
+    data class KeyUnlocked(
+        val type: String = "key:unlocked",
+        val keyName: String
+    ) : ServerEvent()
+
+    @Serializable
+    data class KeyDeleted(
+        val type: String = "key:deleted",
+        val keyName: String
+    ) : ServerEvent()
+
+    @Serializable
+    data class KeyRenamed(
+        val type: String = "key:renamed",
+        val oldName: String,
+        val newName: String
+    ) : ServerEvent()
+
+    @Serializable
+    data class KeyUpdated(
+        val type: String = "key:updated",
+        val keyName: String
     ) : ServerEvent()
 
     @Serializable
@@ -182,6 +207,12 @@ class SignetSSEClient(
                 "stats:updated" -> json.decodeFromString<ServerEvent.StatsUpdated>(data)
                 "app:connected" -> ServerEvent.AppConnected()
                 "app:revoked" -> json.decodeFromString<ServerEvent.AppRevoked>(data)
+                "app:updated" -> ServerEvent.AppUpdated()
+                "key:created" -> ServerEvent.KeyCreated()
+                "key:unlocked" -> json.decodeFromString<ServerEvent.KeyUnlocked>(data)
+                "key:deleted" -> json.decodeFromString<ServerEvent.KeyDeleted>(data)
+                "key:renamed" -> json.decodeFromString<ServerEvent.KeyRenamed>(data)
+                "key:updated" -> json.decodeFromString<ServerEvent.KeyUpdated>(data)
                 else -> ServerEvent.Unknown(type)
             }
         } catch (e: Exception) {

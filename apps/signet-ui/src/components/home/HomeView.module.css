@@ -40,6 +40,19 @@
   background: var(--surface-2);
 }
 
+.statCardClickable {
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+.statCardClickable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .statIcon {
   width: 48px;
   height: 48px;

@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { DisplayRequest, DashboardStats, TrustLevel, RelayStatusResponse, ActivityEntry } from '@signet/types';
 import { Key } from 'lucide-react';
 import { PageHeader } from '../shared/PageHeader.js';
 import { SkeletonStatCard, SkeletonCard } from '../shared/Skeleton.js';
+import { RelayDetailModal } from '../shared/RelayDetailModal.js';
 import { StatsRow } from './StatsRow.js';
 import { PendingRequestsList } from './PendingRequestsList.js';
 import { RecentActivityFeed } from './RecentActivityFeed.js';
@@ -24,6 +25,7 @@ interface HomeViewProps {
   onViewDetails: (request: DisplayRequest) => void;
   onNavigateToActivity: () => void;
   onNavigateToKeys: () => void;
+  onNavigateToApps: () => void;
   onToggleShowAutoApproved: () => void;
 }
 
@@ -43,8 +45,11 @@ export function HomeView({
   onViewDetails,
   onNavigateToActivity,
   onNavigateToKeys,
+  onNavigateToApps,
   onToggleShowAutoApproved,
 }: HomeViewProps) {
+  const [relayModalOpen, setRelayModalOpen] = useState(false);
+
   if (loading) {
     return (
       <div className={styles.container}>
@@ -86,7 +91,20 @@ export function HomeView({
     <div className={styles.container}>
       <PageHeader title="Dashboard" />
 
-      <StatsRow stats={stats} relayStatus={relayStatus} />
+      <StatsRow
+        stats={stats}
+        relayStatus={relayStatus}
+        onRelaysClick={() => setRelayModalOpen(true)}
+        onKeysClick={onNavigateToKeys}
+        onAppsClick={onNavigateToApps}
+        onActivityClick={onNavigateToActivity}
+      />
+
+      <RelayDetailModal
+        open={relayModalOpen}
+        onClose={() => setRelayModalOpen(false)}
+        relayStatus={relayStatus}
+      />
 
       {/* Onboarding - show when no keys exist at all */}
       {stats?.totalKeys === 0 && (

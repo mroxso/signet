@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.1.0]
+
+### Added
+- Android app: Dashboard stat widgets (Active Keys, Apps, Relays) are now tappable. Active Keys and Apps navigate to their respective pages, Relays opens a status sheet showing connection details
+- Web UI: Dashboard stat cards are now clickable. Active Keys, Apps, and Activity navigate to their pages; Relays opens a modal showing connection details for each relay
+- Active Keys widget now shows "active/total" format" to indicate how many keys are unlocked
+- Added single `VERSION` file at repo root, used by all apps (run `pnpm sync-version` after updating)
+
+### Improved
+- Android app: Setup screen now explains what the app does and links to documentation
+- Android app: Setup screen tests server connection before proceeding, with helpful error messages
+
+### Fixed
+- Android app: Revoking apps now works correctly (fixed empty JSON body causing "Bad request" error)
+- Android app: All screens now update in real-time via SSE (Dashboard stats, Keys, Apps, Activity pages)
+- Web UI: All screens now update in real-time via SSE (Dashboard stats, Keys, Apps, Activity pages)
+
+---
+
 ## [1.0.0]
 
 ### Added

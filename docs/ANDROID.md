@@ -21,7 +21,7 @@ cd apps/signet-android
 ./gradlew assembleDebug
 ```
 
-The APK will be at `app/build/outputs/apk/debug/signet-1.0.0-debug.apk`.
+The APK will be at `app/build/outputs/apk/debug/signet-<version>-debug.apk`.
 
 ### Release Build
 
@@ -45,7 +45,7 @@ For a signed release build:
    ./gradlew assembleRelease
    ```
 
-The signed APK will be at `app/build/outputs/apk/release/signet-1.0.0-release.apk`.
+The signed APK will be at `app/build/outputs/apk/release/signet-<version>-release.apk`.
 
 ## Setup
 

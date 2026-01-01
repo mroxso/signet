@@ -14,6 +14,15 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(keystorePropertiesFile.inputStream())
 }
 
+// Read version from repo root VERSION file
+val repoRoot = rootProject.projectDir.parentFile.parentFile
+val versionFile = File(repoRoot, "VERSION")
+val appVersion = if (versionFile.exists()) {
+    versionFile.readText().trim()
+} else {
+    "0.0.0" // Fallback if VERSION file is missing
+}
+
 android {
     namespace = "tech.geektoshi.signet"
     compileSdk = 35
@@ -22,8 +31,8 @@ android {
         applicationId = "tech.geektoshi.signet"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = appVersion
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -66,6 +75,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

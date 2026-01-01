@@ -80,8 +80,12 @@ fun AppsScreen() {
                     refreshCounter++
                 }
                 is ServerEvent.AppRevoked -> {
-                    // App revoked, remove from list or refresh
+                    // App revoked, remove from list
                     apps = apps.filter { it.id != event.appId }
+                }
+                is ServerEvent.AppUpdated -> {
+                    // App updated (trust level or description changed), refresh list
+                    refreshCounter++
                 }
                 else -> {}
             }

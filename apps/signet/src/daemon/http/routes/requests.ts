@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { RequestService, AppService } from '../../services/index.js';
+import { emitCurrentStats } from '../../services/index.js';
 import type { TrustLevel } from '@signet/types';
 import type { PreHandlerFull } from '../types.js';
 import prisma from '../../../db.js';
@@ -100,6 +101,9 @@ export function registerRequestRoutes(
         }
 
         getEventService().emitRequestDenied(id);
+
+        // Emit stats update (pending count changed)
+        await emitCurrentStats();
 
         return reply.send({ ok: true });
     });
@@ -210,6 +214,11 @@ export function registerRequestRoutes(
 
         const approved = results.filter(r => r.success).length;
         const failed = results.filter(r => !r.success).length;
+
+        // Emit stats update (pending count and possibly app count changed)
+        if (approved > 0) {
+            await emitCurrentStats();
+        }
 
         return reply.send({ results, summary: { approved, failed } });
     });
