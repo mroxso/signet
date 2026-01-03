@@ -1,6 +1,15 @@
 package tech.geektoshi.signet.ui.components
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,7 +17,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -17,6 +30,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -32,11 +46,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import tech.geektoshi.signet.data.api.SignetApiClient
 import tech.geektoshi.signet.data.model.PendingRequest
+import tech.geektoshi.signet.ui.theme.BgPrimary
 import tech.geektoshi.signet.ui.theme.BgTertiary
 import tech.geektoshi.signet.ui.theme.BorderDefault
 import tech.geektoshi.signet.ui.theme.Danger
@@ -47,6 +65,8 @@ import tech.geektoshi.signet.ui.theme.TextSecondary
 import tech.geektoshi.signet.util.getKindLabel
 import tech.geektoshi.signet.util.getMethodLabel
 import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,12 +79,14 @@ fun RequestDetailSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var isLoading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var selectedTrustLevel by remember { mutableStateOf(defaultTrustLevel) }
     var appName by remember { mutableStateOf("") }
     var alwaysAllow by remember { mutableStateOf(false) }
     var passphrase by remember { mutableStateOf("") }
+    var rawJsonExpanded by remember { mutableStateOf(false) }
 
     val isPending = request.processedAt == null
     val isConnectRequest = request.method == "connect"
@@ -172,6 +194,67 @@ fun RequestDetailSheet(
             } else {
                 InfoRow(label = "Expires", value = formatDateTime(request.expiresAt))
                 InfoRow(label = "TTL", value = "${request.ttlSeconds}s")
+            }
+
+            // Raw JSON section (collapsible)
+            if (!request.params.isNullOrBlank()) {
+                val formattedJson = remember(request.params) { formatJson(request.params) }
+
+                HorizontalDivider(color = TextMuted.copy(alpha = 0.2f))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { rawJsonExpanded = !rawJsonExpanded }
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Raw JSON",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = TextPrimary
+                    )
+                    Icon(
+                        imageVector = if (rawJsonExpanded) Icons.Default.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = if (rawJsonExpanded) "Collapse" else "Expand",
+                        tint = TextMuted
+                    )
+                }
+
+                AnimatedVisibility(visible = rawJsonExpanded) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(BgPrimary)
+                                .horizontalScroll(rememberScrollState())
+                                .padding(12.dp)
+                        ) {
+                            Text(
+                                text = formattedJson,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontFamily = FontFamily.Monospace
+                                ),
+                                color = TextSecondary
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                copyToClipboard(context, "Raw JSON", formattedJson)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = SignetPurple
+                            )
+                        ) {
+                            Text("Copy to Clipboard")
+                        }
+                    }
+                }
             }
 
             // Error message
@@ -481,4 +564,27 @@ private fun TrustLevelChip(
             labelColor = TextSecondary
         )
     )
+}
+
+private fun formatJson(json: String): String {
+    return try {
+        // Try parsing as array first (NIP-46 params are often arrays)
+        val trimmed = json.trim()
+        if (trimmed.startsWith("[")) {
+            JSONArray(trimmed).toString(2)
+        } else if (trimmed.startsWith("{")) {
+            JSONObject(trimmed).toString(2)
+        } else {
+            json
+        }
+    } catch (e: Exception) {
+        json
+    }
+}
+
+private fun copyToClipboard(context: Context, label: String, text: String) {
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    val clip = ClipData.newPlainText(label, text)
+    clipboard.setPrimaryClip(clip)
+    Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
 }

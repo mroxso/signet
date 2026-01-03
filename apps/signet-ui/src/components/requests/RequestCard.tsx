@@ -62,65 +62,65 @@ export function RequestCard({
 
   return (
     <div className={`${styles.card} ${styles[request.state]} ${showCompact ? styles.compact : ''}`}>
+      {/* Line 1: App name • key + Status badge */}
       <div className={styles.header}>
         {selectionMode && isPending && (
           <input
             type="checkbox"
             checked={selected}
-            onChange={onSelect}
+            onChange={(e) => { e.stopPropagation(); onSelect(); }}
+            onClick={(e) => e.stopPropagation()}
             className={styles.checkbox}
             aria-label={`Select request ${request.id}`}
           />
         )}
-        <div className={styles.method}>
-          <span className={styles.methodIcon} aria-hidden="true">
-            <MethodIcon size={16} />
+        <div className={styles.headerLeft}>
+          <span className={styles.appName}>
+            {request.appName || `${request.npub.slice(0, 16)}...`}
           </span>
-          <span className={styles.methodName}>
-            {getMethodLabel(request.method, eventKind)}
-          </span>
+          <span className={styles.separator}>•</span>
+          <span className={styles.keyName}>{request.keyName || 'Unknown key'}</span>
         </div>
-        <div className={styles.headerRight}>
-          <div className={styles.status}>
-            {request.state === 'pending' && (
-              <span className={styles.ttl}>{formatTtl(request.ttl)}</span>
-            )}
-            {request.state === 'expired' && (
-              <span className={styles.expired}>Expired</span>
-            )}
-            {request.state === 'approved' && (
-              <span className={request.autoApproved ? styles.autoApproved : styles.approved}>
-                {request.autoApproved ? 'Auto Approved' : 'Approved'}
-              </span>
-            )}
-            {request.state === 'denied' && (
-              <span className={styles.denied}>Denied</span>
-            )}
-          </div>
-          <button
-            type="button"
-            className={styles.detailsButton}
-            onClick={onViewDetails}
-            aria-label="View request details"
-          >
-            Details
-          </button>
+        <div className={styles.statusBadge}>
+          {request.state === 'pending' && (
+            <span className={styles.badgePending}>{formatTtl(request.ttl)}</span>
+          )}
+          {request.state === 'expired' && (
+            <span className={styles.badgeExpired}>Expired</span>
+          )}
+          {request.state === 'approved' && (
+            <span className={request.autoApproved ? styles.badgeAuto : styles.badgeApproved}>
+              {request.autoApproved ? 'Auto Approved' : 'Approved'}
+            </span>
+          )}
+          {request.state === 'denied' && (
+            <span className={styles.badgeDenied}>Denied</span>
+          )}
         </div>
       </div>
 
-      <div className={styles.details}>
-        <div className={styles.meta}>
-          {request.keyName && (
-            <span className={styles.keyName}>{request.keyName}</span>
-          )}
-          <span className={styles.separator}>•</span>
-          <span className={styles.npub} title={request.npub}>
-            {request.appName || `${request.npub.slice(0, 12)}...${request.npub.slice(-6)}`}
-          </span>
-          <span className={styles.separator}>•</span>
-          <span className={styles.time}>{request.createdLabel}</span>
-        </div>
+      {/* Line 2: Icon + event info (Details) • timestamp */}
+      <div className={styles.methodRow}>
+        <span className={styles.methodIcon} aria-hidden="true">
+          <MethodIcon size={14} />
+        </span>
+        <span className={styles.methodName}>
+          {getMethodLabel(request.method, eventKind)}
+        </span>
+        <button
+          type="button"
+          className={styles.detailsLink}
+          onClick={onViewDetails}
+          aria-label={`View details for ${request.appName || 'request'}`}
+        >
+          (Details)
+        </button>
+        <span className={styles.separator}>•</span>
+        <span className={styles.time}>{request.createdLabel}</span>
+      </div>
 
+      {/* Expandable content for pending requests */}
+      <div className={styles.details}>
         {isPending && request.eventPreview && (
           <div className={styles.eventPreview}>
             <div className={styles.eventKind}>

@@ -24,8 +24,8 @@ export function RecentActivityFeed({
   const recentActivity = filteredActivity.slice(0, 5);
 
   const getActivityIcon = (type: string) => {
-    if (type === 'approved') return <Check size={14} className={styles.activityIconApproved} />;
-    if (type === 'denied') return <X size={14} className={styles.activityIconDenied} />;
+    if (type === 'approval') return <Check size={14} className={styles.activityIconApproved} />;
+    if (type === 'denial') return <X size={14} className={styles.activityIconDenied} />;
     return <Clock size={14} className={styles.activityIconPending} />;
   };
 
@@ -53,15 +53,29 @@ export function RecentActivityFeed({
         <div className={styles.listCard}>
           {recentActivity.map((entry) => (
             <div key={entry.id} className={styles.activityItem}>
-              {getActivityIcon(entry.type)}
-              <span className={styles.activityMethod}>{entry.method ? getMethodLabelPastTense(entry.method, entry.eventKind) : entry.type}</span>
-              <span className={styles.activityMeta}>
-                {entry.appName || entry.keyName || 'Unknown'}
-              </span>
-              <span className={styles.activityTime}>
-                {entry.autoApproved && <span className={styles.autoBadge}>Auto</span>}
-                {formatTimeAgo(entry.timestamp)}
-              </span>
+              <div className={styles.activityRow}>
+                {getActivityIcon(entry.type)}
+                <span className={styles.activityAppName}>
+                  {entry.appName || 'Unknown'}
+                  {entry.keyName && <span className={styles.activityKeyName}> • {entry.keyName}</span>}
+                </span>
+                <span className={styles.statusBadge}>
+                  {entry.autoApproved ? (
+                    <span className={styles.badgeAuto}>Auto Approved</span>
+                  ) : entry.type === 'approval' ? (
+                    <span className={styles.badgeApproved}>Approved</span>
+                  ) : entry.type === 'denial' ? (
+                    <span className={styles.badgeDenied}>Denied</span>
+                  ) : null}
+                </span>
+              </div>
+              <div className={styles.activityRow}>
+                <span className={styles.activityMethod}>
+                  {entry.method ? getMethodLabelPastTense(entry.method, entry.eventKind) : entry.type}
+                  {' • '}
+                  {formatTimeAgo(entry.timestamp)}
+                </span>
+              </div>
             </div>
           ))}
           <button type="button" className={styles.viewAllButton} onClick={onNavigateToActivity}>

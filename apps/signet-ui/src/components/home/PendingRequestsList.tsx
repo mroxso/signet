@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { DisplayRequest, TrustLevel } from '@signet/types';
-import { getMethodLabel } from '@signet/types';
+import { getMethodLabel, getKindLabel } from '@signet/types';
 import { ChevronDown, ChevronRight, Check, X, Inbox } from 'lucide-react';
 import { getTrustLevelInfo } from '../../lib/event-labels.js';
 import styles from './HomeView.module.css';
@@ -30,6 +30,7 @@ export function PendingRequestsList({
 }: PendingRequestsListProps) {
   const [expandedRequestId, setExpandedRequestId] = useState<string | null>(null);
   const [selectedTrustLevels, setSelectedTrustLevels] = useState<Record<string, TrustLevel>>({});
+  const [alwaysAllowFlags, setAlwaysAllowFlags] = useState<Record<string, boolean>>({});
   const [removingItems, setRemovingItems] = useState<Record<string, 'approved' | 'denied'>>({});
 
   const pendingRequests = requests.filter(r => r.state === 'pending');
@@ -42,10 +43,10 @@ export function PendingRequestsList({
     setSelectedTrustLevels(prev => ({ ...prev, [requestId]: level }));
   };
 
-  const handleApprove = async (requestId: string, trustLevel?: TrustLevel, appName?: string) => {
+  const handleApprove = async (requestId: string, trustLevel?: TrustLevel, alwaysAllow?: boolean, allowKind?: number, appName?: string) => {
     setRemovingItems(prev => ({ ...prev, [requestId]: 'approved' }));
     await new Promise(resolve => setTimeout(resolve, 300));
-    await onApprove(requestId, trustLevel, undefined, undefined, appName);
+    await onApprove(requestId, trustLevel, alwaysAllow, allowKind, appName);
     setRemovingItems(prev => {
       const next = { ...prev };
       delete next[requestId];
@@ -93,19 +94,30 @@ export function PendingRequestsList({
                   onClick={() => setExpandedRequestId(isExpanded ? null : request.id)}
                   aria-expanded={isExpanded}
                 >
-                  <span className={styles.pendingDot} />
-                  <span className={styles.listItemMethod}>{getMethodLabel(request.method, request.eventPreview?.kind)}</span>
-                  <span className={styles.listItemMeta}>
-                    {request.keyName || 'Unknown'} &bull; {request.createdLabel}
-                  </span>
-                  {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  <div className={styles.listItemRow}>
+                    <span className={styles.pendingDot} />
+                    <span className={styles.listItemAppName}>
+                      {request.appName || request.npub.slice(0, 16) + '...'}
+                    </span>
+                    <span className={styles.listItemTime}>
+                      {request.createdLabel}
+                      {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                    </span>
+                  </div>
+                  <div className={styles.listItemRow}>
+                    <span className={styles.listItemMethod}>
+                      {getMethodLabel(request.method, request.eventPreview?.kind)} &bull; {request.keyName || 'Unknown key'}
+                    </span>
+                  </div>
                 </button>
                 {isExpanded && (
                   <div className={styles.listItemExpanded}>
                     <div className={styles.listItemDetails}>
                       <div className={styles.detailRow}>
                         <span className={styles.detailLabel}>From:</span>
-                        <code className={styles.detailValue}>{request.npub.slice(0, 20)}...</code>
+                        <span className={styles.detailValue}>
+                          {request.appName || <code>{request.npub.slice(0, 20)}...</code>}
+                        </span>
                       </div>
                       {request.requiresPassword && (
                         <div className={styles.detailRow}>
@@ -119,6 +131,21 @@ export function PendingRequestsList({
                             placeholder="Enter key password"
                           />
                         </div>
+                      )}
+                      {request.method !== 'connect' && (
+                        <label className={styles.alwaysAllowLabel}>
+                          <input
+                            type="checkbox"
+                            checked={alwaysAllowFlags[request.id] || false}
+                            onChange={(e) => setAlwaysAllowFlags(prev => ({ ...prev, [request.id]: e.target.checked }))}
+                            className={styles.alwaysAllowCheckbox}
+                          />
+                          <span>
+                            {request.method === 'sign_event' && request.eventPreview?.kind !== undefined
+                              ? `Always allow ${getKindLabel(request.eventPreview.kind)}`
+                              : 'Always allow this action'}
+                          </span>
+                        </label>
                       )}
                       {request.method === 'connect' && (
                         <>
@@ -160,11 +187,17 @@ export function PendingRequestsList({
                       <button
                         type="button"
                         className={styles.approveButton}
-                        onClick={() => handleApprove(
-                          request.id,
-                          request.method === 'connect' ? getTrustLevel(request.id) : undefined,
-                          request.method === 'connect' ? appNames[request.id] : undefined
-                        )}
+                        onClick={() => {
+                          const alwaysAllow = request.method !== 'connect' ? alwaysAllowFlags[request.id] : undefined;
+                          const allowKind = alwaysAllow && request.method === 'sign_event' ? request.eventPreview?.kind : undefined;
+                          handleApprove(
+                            request.id,
+                            request.method === 'connect' ? getTrustLevel(request.id) : undefined,
+                            alwaysAllow,
+                            allowKind,
+                            request.method === 'connect' ? appNames[request.id] : undefined
+                          );
+                        }}
                         disabled={!!removingState}
                       >
                         {removingState === 'approved' ? <Check size={16} /> : 'Approve'}

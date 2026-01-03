@@ -31,7 +31,7 @@ fun StatusBadge(
     val (text, backgroundColor, textColor) = when (status) {
         BadgeStatus.PENDING -> Triple("Pending", Warning.copy(alpha = 0.15f), Warning)
         BadgeStatus.APPROVED -> Triple("Approved", Success.copy(alpha = 0.15f), Success)
-        BadgeStatus.AUTO_APPROVED -> Triple("Auto", Success.copy(alpha = 0.15f), Success)
+        BadgeStatus.AUTO_APPROVED -> Triple("Auto Approved", Success.copy(alpha = 0.15f), Success)
         BadgeStatus.DENIED -> Triple("Denied", Danger.copy(alpha = 0.15f), Danger)
         BadgeStatus.EXPIRED -> Triple("Expired", TextMuted.copy(alpha = 0.15f), TextMuted)
     }

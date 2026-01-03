@@ -13,6 +13,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.Security
+import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -251,17 +254,28 @@ private fun AppCard(
 
 @Composable
 private fun TrustLevelBadge(trustLevel: String) {
-    val (color, label) = when (trustLevel.lowercase()) {
-        "full" -> Success to "Full"
-        "reasonable" -> SignetPurple to "Reasonable"
-        "paranoid" -> Warning to "Paranoid"
-        else -> TextMuted to trustLevel
+    val (color, label, icon) = when (trustLevel.lowercase()) {
+        "full" -> Triple(Success, "Full", Icons.Outlined.Security)
+        "reasonable" -> Triple(SignetPurple, "Reasonable", Icons.Outlined.Shield)
+        "paranoid" -> Triple(Warning, "Paranoid", Icons.Outlined.Shield)
+        else -> Triple(TextMuted, trustLevel, Icons.Outlined.Shield)
     }
 
-    Text(
-        text = label,
-        style = MaterialTheme.typography.labelSmall,
-        color = color
-    )
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.height(14.dp)
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = color
+        )
+    }
 }
 

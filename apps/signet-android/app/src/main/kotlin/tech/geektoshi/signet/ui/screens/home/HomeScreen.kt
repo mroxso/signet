@@ -13,9 +13,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material.icons.outlined.SettingsInputAntenna
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -268,7 +271,8 @@ fun HomeScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 StatCard(
-                    title = "Active Keys",
+                    icon = Icons.Outlined.Key,
+                    title = "Keys",
                     value = dashboard?.stats?.let {
                         if (it.totalKeys == 0) "0" else "${it.activeKeys}/${it.totalKeys}"
                     } ?: "-",
@@ -276,12 +280,14 @@ fun HomeScreen(
                     onClick = onNavigateToKeys
                 )
                 StatCard(
+                    icon = Icons.Outlined.Apps,
                     title = "Apps",
                     value = dashboard?.stats?.connectedApps?.toString() ?: "0",
                     modifier = Modifier.weight(1f),
                     onClick = onNavigateToApps
                 )
                 StatCard(
+                    icon = Icons.Outlined.SettingsInputAntenna,
                     title = "Relays",
                     value = relays?.let { "${it.connected}/${it.total}" } ?: "-",
                     modifier = Modifier.weight(1f),
@@ -354,10 +360,10 @@ fun HomeScreen(
 
 @Composable
 private fun StatCard(
+    icon: ImageVector,
     title: String,
     value: String,
     modifier: Modifier = Modifier,
-    highlight: Boolean = false,
     onClick: (() -> Unit)? = null
 ) {
     Card(
@@ -376,15 +382,26 @@ private fun StatCard(
         ) {
             Text(
                 text = value,
-                style = MaterialTheme.typography.headlineMedium,
-                color = if (highlight) Warning else SignetPurple
+                style = MaterialTheme.typography.headlineLarge,
+                color = TextPrimary
             )
             Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary
-            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = TextSecondary,
+                    modifier = Modifier.size(14.dp)
+                )
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+            }
         }
     }
 }

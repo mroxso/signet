@@ -20,6 +20,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.QrCodeScanner
+import androidx.compose.material.icons.outlined.Security
+import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -208,6 +211,7 @@ fun SettingsScreen(
                 )
 
                 TrustLevelOption(
+                    icon = Icons.Outlined.Shield,
                     title = "Paranoid",
                     description = "Require approval for every request",
                     selected = selectedTrustLevel == "paranoid",
@@ -223,6 +227,7 @@ fun SettingsScreen(
                 )
 
                 TrustLevelOption(
+                    icon = Icons.Outlined.Shield,
                     title = "Reasonable",
                     description = "Auto-approve notes, reactions, reposts, and zaps",
                     selected = selectedTrustLevel == "reasonable",
@@ -238,6 +243,7 @@ fun SettingsScreen(
                 )
 
                 TrustLevelOption(
+                    icon = Icons.Outlined.Security,
                     title = "Full",
                     description = "Auto-approve all requests (use with caution)",
                     selected = selectedTrustLevel == "full",
@@ -413,6 +419,7 @@ fun SettingsScreen(
 
 @Composable
 private fun TrustLevelOption(
+    icon: ImageVector,
     title: String,
     description: String,
     selected: Boolean,
@@ -423,9 +430,15 @@ private fun TrustLevelOption(
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (selected) SignetPurple else TextMuted,
+            modifier = Modifier.size(20.dp)
+        )
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,

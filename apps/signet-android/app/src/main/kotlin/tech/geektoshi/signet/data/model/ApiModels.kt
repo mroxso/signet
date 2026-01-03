@@ -184,3 +184,14 @@ data class OperationResponse(
     val ok: Boolean = false,
     val error: String? = null
 )
+
+/**
+ * Request body for approving a request
+ */
+@Serializable
+data class ApproveRequestBody(
+    val trustLevel: String? = null,
+    val alwaysAllow: Boolean? = null,
+    val appName: String? = null,
+    val passphrase: String? = null
+)

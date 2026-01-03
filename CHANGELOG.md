@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.2.1]
+
+### Added
+- Android: Added collapsible "Raw JSON" view to request details sheet with copy to clipboard
+- Android: Trust level badges in Apps list now show icons
+- Android: Trust level options in Settings now show icons
+- Android: Dashboard stat cards now show icons
+- Documentation: Added sample systemd and runit service files for daemon and UI to DEPLOYMENT.md
+
+### Changed
+- Web UI: Home page widgets now use two-line layout matching Android (app name first, event details below)
+- Web UI: Activity page and Recent widget cards redesigned with two-line format: app name • key + status badge on first line, event info (Details) • timestamp on second line
+- Web UI: Status indicators now display as colored pill badges (Auto Approved, Approved, Denied, Expired, Pending)
+- Web UI & Android: Changed "Auto" badge text to "Auto Approved" for clarity
+
+### Fixed
+- Android: Fixed serialization error when using "Always allow" checkbox (#19)
+- Web UI: Added "Always allow" checkbox to Home page Pending widget which was previously only available on Activity page
+- Web UI: Pending widget now shows app name instead of npub when available
+- Web UI: Fixed Recent widget icons not displaying correctly (was checking wrong status values)
+
+---
+
 ## [1.2.0]
 
 ### Security

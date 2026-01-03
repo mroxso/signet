@@ -1,5 +1,6 @@
 package tech.geektoshi.signet.data.api
 
+import tech.geektoshi.signet.data.model.ApproveRequestBody
 import tech.geektoshi.signet.data.model.AppsResponse
 import tech.geektoshi.signet.data.model.DashboardResponse
 import tech.geektoshi.signet.data.model.KeysResponse
@@ -31,6 +32,7 @@ class SignetApiClient(
             json(Json {
                 ignoreUnknownKeys = true
                 isLenient = true
+                explicitNulls = false
             })
         }
         defaultRequest {
@@ -74,12 +76,12 @@ class SignetApiClient(
         passphrase: String? = null
     ): OperationResponse {
         return client.post("/requests/$id") {
-            setBody(mapOf(
-                "trustLevel" to trustLevel,
-                "alwaysAllow" to alwaysAllow,
-                "appName" to appName,
-                "passphrase" to passphrase
-            ).filterValues { it != null && it != false && it != "" })
+            setBody(ApproveRequestBody(
+                trustLevel = trustLevel,
+                alwaysAllow = if (alwaysAllow) true else null,
+                appName = appName?.ifBlank { null },
+                passphrase = passphrase?.ifBlank { null }
+            ))
         }.body()
     }
 
