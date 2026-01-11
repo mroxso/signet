@@ -4,7 +4,9 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
@@ -48,6 +51,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import tech.geektoshi.signet.data.api.SignetApiClient
 import tech.geektoshi.signet.data.model.KeyInfo
+import tech.geektoshi.signet.util.ClearSensitiveDataOnDispose
 import tech.geektoshi.signet.ui.theme.BgTertiary
 import tech.geektoshi.signet.ui.theme.BorderDefault
 import tech.geektoshi.signet.ui.theme.Danger
@@ -75,8 +79,12 @@ fun KeyDetailSheet(
     var error by remember { mutableStateOf<String?>(null) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showUnlock by remember { mutableStateOf(false) }
-    var passphrase by remember { mutableStateOf("") }
+    val passphraseState = remember { mutableStateOf("") }
+    var passphrase by passphraseState
     var showBunkerURISheet by remember { mutableStateOf(false) }
+
+    // Clear sensitive data when sheet is dismissed
+    ClearSensitiveDataOnDispose(passphraseState)
 
     val isLocked = key.status.lowercase() == "locked"
     val isOnline = key.status.lowercase() == "online"
@@ -103,7 +111,7 @@ fun KeyDetailSheet(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Header
+            // Header: Status dot + Key name + Encryption badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -113,21 +121,26 @@ fun KeyDetailSheet(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    // Status dot: green = online, orange = locked, gray = offline
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .background(
+                                color = when (key.status.lowercase()) {
+                                    "online" -> Success
+                                    "locked" -> Warning
+                                    else -> TextMuted
+                                },
+                                shape = CircleShape
+                            )
+                    )
                     Text(
                         text = key.name,
                         style = MaterialTheme.typography.headlineSmall,
                         color = TextPrimary
                     )
-                    if (key.isEncrypted) {
-                        Icon(
-                            imageVector = Icons.Default.Lock,
-                            contentDescription = "Encrypted",
-                            modifier = Modifier.size(20.dp),
-                            tint = SignetPurple
-                        )
-                    }
                 }
-                StatusBadge(status = key.status)
+                EncryptionBadge(isEncrypted = key.isEncrypted)
             }
 
             HorizontalDivider(color = TextMuted.copy(alpha = 0.2f))
@@ -429,15 +442,15 @@ fun KeyDetailSheet(
 }
 
 @Composable
-private fun StatusBadge(status: String) {
-    val color = when (status.lowercase()) {
-        "online" -> Success
-        "locked" -> Warning
-        else -> TextMuted
+private fun EncryptionBadge(isEncrypted: Boolean) {
+    val (color, label) = if (isEncrypted) {
+        Success to "Encrypted"
+    } else {
+        Warning to "Unprotected"
     }
 
     Text(
-        text = status.replaceFirstChar { it.uppercase() },
+        text = label,
         style = MaterialTheme.typography.labelMedium,
         color = color
     )

@@ -4,7 +4,7 @@ import { LoadingSpinner } from '../shared/LoadingSpinner.js';
 import { ConfirmDialog } from '../shared/ConfirmDialog.js';
 import { QRModal } from '../shared/QRModal.js';
 import { PageHeader } from '../shared/PageHeader.js';
-import { Key } from 'lucide-react';
+import { Key, Lock, Plus, Loader2 } from 'lucide-react';
 import { CreateKeyForm } from './CreateKeyForm.js';
 import { KeyCard } from './KeyCard.js';
 import styles from './KeysPanel.module.css';
@@ -18,12 +18,14 @@ interface KeysPanelProps {
   deleting: boolean;
   unlocking: string | null;
   locking: string | null;
+  lockingAll: boolean;
   renaming: boolean;
   settingPassphrase: boolean;
   onCreateKey: (data: { keyName: string; passphrase?: string; nsec?: string }) => Promise<KeyInfo | null>;
   onDeleteKey: (keyName: string, passphrase?: string) => Promise<{ success: boolean; revokedApps?: number }>;
   onUnlockKey: (keyName: string, passphrase: string) => Promise<boolean>;
   onLockKey: (keyName: string) => Promise<boolean>;
+  onLockAllKeys: () => Promise<{ success: boolean; lockedCount?: number }>;
   onRenameKey: (keyName: string, newName: string) => Promise<boolean>;
   onSetPassphrase: (keyName: string, passphrase: string) => Promise<boolean>;
   onClearError: () => void;
@@ -38,12 +40,14 @@ export function KeysPanel({
   deleting,
   unlocking,
   locking,
+  lockingAll,
   renaming,
   settingPassphrase,
   onCreateKey,
   onDeleteKey,
   onUnlockKey,
   onLockKey,
+  onLockAllKeys,
   onRenameKey,
   onSetPassphrase,
   onClearError,
@@ -53,6 +57,13 @@ export function KeysPanel({
   const [deleteConfirm, setDeleteConfirm] = useState<KeyInfo | null>(null);
   const [deletePassphrase, setDeletePassphrase] = useState('');
   const [qrModal, setQrModal] = useState<{ value: string; title: string } | null>(null);
+  const [showLockAllConfirm, setShowLockAllConfirm] = useState(false);
+
+  // Count lockable keys (online + encrypted)
+  const lockableKeysCount = useMemo(() =>
+    keys.filter(k => k.status === 'online' && k.isEncrypted).length,
+    [keys]
+  );
 
   const now = useMemo(() => Date.now(), [keys]);
 
@@ -117,6 +128,13 @@ export function KeysPanel({
     return success;
   };
 
+  const handleLockAllConfirm = async () => {
+    const result = await onLockAllKeys();
+    if (result.success) {
+      setShowLockAllConfirm(false);
+    }
+  };
+
   if (loading && keys.length === 0) {
     return <LoadingSpinner text="Loading keys..." />;
   }
@@ -127,16 +145,30 @@ export function KeysPanel({
         title="Keys"
         count={keys.length}
         action={
-          <button
-            type="button"
-            className={styles.addButton}
-            onClick={() => {
-              setShowCreateForm(!showCreateForm);
-              onClearError();
-            }}
-          >
-            {showCreateForm ? 'Cancel' : '+ Add Key'}
-          </button>
+          <div className={styles.headerActions}>
+            <button
+              type="button"
+              className={styles.iconButton}
+              onClick={() => setShowLockAllConfirm(true)}
+              disabled={lockableKeysCount === 0 || lockingAll}
+              title="Lock all keys"
+              aria-label="Lock all keys"
+            >
+              {lockingAll ? <Loader2 size={16} className={styles.spinning} /> : <Lock size={16} />}
+            </button>
+            <button
+              type="button"
+              className={styles.iconButton}
+              onClick={() => {
+                setShowCreateForm(!showCreateForm);
+                onClearError();
+              }}
+              title={showCreateForm ? 'Cancel' : 'Add key'}
+              aria-label={showCreateForm ? 'Cancel' : 'Add key'}
+            >
+              <Plus size={16} className={showCreateForm ? styles.rotated : ''} />
+            </button>
+          </div>
         }
       />
 
@@ -231,6 +263,26 @@ export function KeysPanel({
         onClose={() => setQrModal(null)}
         value={qrModal?.value ?? ''}
         title={qrModal?.title}
+      />
+
+      <ConfirmDialog
+        open={showLockAllConfirm}
+        title="Lock All Keys"
+        message={
+          <div>
+            <p>
+              Lock all <strong>{lockableKeysCount}</strong> {lockableKeysCount === 1 ? 'key' : 'keys'}?
+            </p>
+            <p className={styles.deleteWarning}>
+              You'll need to enter passphrases to unlock them.
+            </p>
+          </div>
+        }
+        confirmLabel={lockingAll ? 'Locking...' : 'Lock All'}
+        danger
+        disabled={lockingAll}
+        onConfirm={handleLockAllConfirm}
+        onCancel={() => setShowLockAllConfirm(false)}
       />
     </div>
   );

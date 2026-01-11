@@ -4,6 +4,7 @@ import type { ConnectionManager } from '../../connection-manager.js';
 import type { RelayService } from '../../services/index.js';
 import type { NostrConfig } from '../../../config/types.js';
 import type { PreHandlerAuthCsrf } from '../types.js';
+import { logger } from '../../lib/logger.js';
 
 export interface ConnectionRouteConfig {
     connectionManager: ConnectionManager;
@@ -58,7 +59,7 @@ export function registerConnectionRoutes(
      * POST /connections/refresh
      */
     fastify.post('/connections/refresh', { preHandler: [...preHandler.auth, ...preHandler.csrf] }, async (_request: FastifyRequest, reply: FastifyReply) => {
-        console.log('[API] Relay pool refresh requested');
+        logger.info('Relay pool refresh requested via API');
         config.relayService.resetPool();
         return reply.send({ ok: true, message: 'Relay pool reset initiated' });
     });

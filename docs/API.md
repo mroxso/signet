@@ -545,6 +545,34 @@ Generate a one-time connection token for a key. Returns a bunker URI with a toke
 
 ---
 
+#### `POST /keys/lock-all`
+
+Lock all active (unlocked) keys at once. Keys are removed from memory but remain encrypted on disk with all apps and permissions preserved.
+
+**Authentication:** Required
+**CSRF:** Required
+
+**Request Body:** Empty object `{}`
+
+**Response:**
+```json
+{
+  "ok": true,
+  "lockedCount": 3
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `lockedCount` | number | Number of keys that were locked |
+
+**Notes:**
+- Only locks keys that are currently active (unlocked)
+- Keys that are already locked or unencrypted are skipped
+- Each locked key is logged as a `key_locked` admin event
+
+---
+
 #### `DELETE /keys/:keyName`
 
 Delete a key and revoke all connected apps.
@@ -725,6 +753,71 @@ Resume a suspended app, allowing signing requests again.
 - `400` - Invalid app ID
 - `400` - App is not suspended
 - `404` - App not found
+
+---
+
+#### `POST /apps/suspend-all`
+
+Suspend all active (non-suspended) apps at once, temporarily blocking all signing requests.
+
+**Authentication:** Required
+**CSRF:** Required
+
+**Request Body:**
+```json
+{
+  "until": "2025-01-20T15:00:00.000Z"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `until` | string | No | ISO 8601 timestamp when suspensions should automatically end. If omitted, suspensions are indefinite until manually resumed. |
+
+**Response:**
+```json
+{
+  "ok": true,
+  "suspendedCount": 5
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `suspendedCount` | number | Number of apps that were suspended |
+
+**Notes:**
+- Only suspends apps that are currently active (not already suspended)
+- Already suspended apps are skipped
+- Each suspended app is logged as an `app_suspended` admin event
+
+---
+
+#### `POST /apps/resume-all`
+
+Resume all suspended apps at once, allowing signing requests again.
+
+**Authentication:** Required
+**CSRF:** Required
+
+**Request Body:** Empty object `{}`
+
+**Response:**
+```json
+{
+  "ok": true,
+  "resumedCount": 5
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `resumedCount` | number | Number of apps that were resumed |
+
+**Notes:**
+- Only resumes apps that are currently suspended
+- Active apps are skipped
+- Each resumed app is logged as an `app_unsuspended` admin event
 
 ---
 

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { KeyInfo } from '@signet/types';
-import { apiGet, apiPost, apiPatch, apiDelete } from '../lib/api-client.js';
+import { apiGet, apiPost, apiPatch, apiDelete, lockAllKeys as lockAllKeysApi } from '../lib/api-client.js';
 import { buildErrorMessage } from '../lib/formatters.js';
 import { useMutation } from './useMutation.js';
 import { useSSESubscription } from '../contexts/ServerEventsContext.js';
@@ -21,12 +21,14 @@ interface UseKeysResult {
     deleteKey: (keyName: string, passphrase?: string) => Promise<{ success: boolean; revokedApps?: number }>;
     unlockKey: (keyName: string, passphrase: string) => Promise<boolean>;
     lockKey: (keyName: string) => Promise<boolean>;
+    lockAllKeys: () => Promise<{ success: boolean; lockedCount?: number }>;
     renameKey: (keyName: string, newName: string) => Promise<boolean>;
     setPassphrase: (keyName: string, passphrase: string) => Promise<boolean>;
     creating: boolean;
     deleting: boolean;
     unlocking: string | null;  // Key name being unlocked, or null
     locking: string | null;    // Key name being locked, or null
+    lockingAll: boolean;
     renaming: boolean;
     settingPassphrase: boolean;
     clearError: () => void;
@@ -139,6 +141,18 @@ export function useKeys(): UseKeysResult {
         { errorPrefix: 'Failed to lock key', onSuccess: refresh, onError: setError }
     );
 
+    // Lock all keys mutation
+    const lockAllMutation = useMutation(
+        async () => {
+            const result = await lockAllKeysApi();
+            if (!result.ok) {
+                throw new Error(result.error || 'Failed to lock all keys');
+            }
+            return { success: true, lockedCount: result.lockedCount };
+        },
+        { errorPrefix: 'Failed to lock all keys', onSuccess: refresh, onError: setError }
+    );
+
     // Rename key mutation
     const renameMutation = useMutation(
         async ({ keyName, newName }: { keyName: string; newName: string }) => {
@@ -205,6 +219,11 @@ export function useKeys(): UseKeysResult {
         }
     }, [lockMutation]);
 
+    const lockAllKeys = useCallback(async () => {
+        const result = await lockAllMutation.mutate(undefined);
+        return result ?? { success: false };
+    }, [lockAllMutation]);
+
     const renameKey = useCallback(async (keyName: string, newName: string) => {
         const result = await renameMutation.mutate({ keyName, newName });
         return result ?? false;
@@ -225,6 +244,7 @@ export function useKeys(): UseKeysResult {
         || deleteMutation.error
         || unlockMutation.error
         || lockMutation.error
+        || lockAllMutation.error
         || renameMutation.error
         || setPassphraseMutation.error;
 
@@ -237,12 +257,14 @@ export function useKeys(): UseKeysResult {
         deleteKey,
         unlockKey,
         lockKey,
+        lockAllKeys,
         renameKey,
         setPassphrase,
         creating: createMutation.loading,
         deleting: deleteMutation.loading,
         unlocking: unlockingKeyName,
         locking: lockingKeyName,
+        lockingAll: lockAllMutation.loading,
         renaming: renameMutation.loading,
         settingPassphrase: setPassphraseMutation.loading,
         clearError,

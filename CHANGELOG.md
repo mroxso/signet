@@ -1,5 +1,121 @@
 # Changelog
 
+## [1.6.0]
+
+### Added
+- **Android: Deep link and share target support for nostrconnect:// URIs**
+  - Tap `nostrconnect://` links from any app to open directly in Signet
+  - Share text containing `nostrconnect://` URIs to Signet via Android share sheet
+  - New dedicated `DeepLinkConnectSheet` for streamlined connection flow
+  - Automatically extracts app name, relays, and permissions from URI
+- **Daemon: Structured logging with timestamps** ([#35](https://github.com/Letdown2491/signet/issues/35))
+  - All log entries now include ISO timestamps for easier debugging and log aggregation
+  - New `LOG_LEVEL` environment variable: `debug`, `info`, `warn`, `error` (default: `info`)
+  - New `LOG_FORMAT` environment variable: `pretty` (default) or `json` for log aggregators
+  - Zero dependencies - custom logger with pino-compatible API for future migration
+  - Structured data support: `logger.info('message', { key: 'value' })`
+  - Child loggers for contextual logging (e.g., per-key context)
+  - Works seamlessly with systemd `StandardOutput=append:` for log file redirection
+- **Web UI: Logs page for real-time daemon log viewing**
+  - New "Logs" entry in sidebar between Activity and Keys
+  - In-memory ring buffer stores last 1000 log entries
+  - Real-time streaming via SSE - logs appear instantly as they're generated
+  - Filter by log level (debug, info, warn, error)
+  - Text search across log messages
+  - Pause/resume live updates
+  - Expandable metadata view for structured log data
+  - `GET /logs` API endpoint with level, search, and limit query params
+- **Daemon: Centralized utilities for better code quality**
+  - `lib/errors.ts`: Safe error message extraction from unknown types, HTML escaping for XSS prevention
+  - `lib/validation.ts`: Input validation for key names, app names, passphrases, URIs, and relay lists
+  - `lib/parse.ts`: Safe NIP-46 param parsing that handles both array and object formats
+  - `lib/ttl-cache.ts`: Generic TTL cache with LRU eviction, background cleanup, and stats reporting
+- **Web UI: Structured API client error handling**
+  - `ApiError` class preserves HTTP status code with helper methods (`isCsrfError`, `isAuthError`, `isServerError`)
+  - `TimeoutError` class for request timeout handling
+  - Request deduplication prevents multiple simultaneous identical requests
+  - Configurable request timeout with AbortController-based cancellation
+- **Web UI: Hook refactoring for better separation of concerns**
+  - `useRequestFilters.ts`: Extracted filter, search, and sort logic from useRequests
+  - `useRequestSelection.ts`: Extracted bulk selection state management from useRequests
+- **Web UI: Copy bunker URI button in sidebar keys**
+  - Each online key now has a copy icon button for quick bunker URI access
+  - Generates a one-time connection token and copies the full bunker URI
+  - Shows loading spinner while generating, checkmark on success
+- **Web UI: Bulk key and app management**
+  - Keys page: Lock All button (lock icon) locks all unlocked keys with confirmation
+  - Apps page: Suspend/Resume toggle button (pause/play icon)
+    - Shows pause icon when any apps active → opens suspend modal with duration picker
+    - Shows play icon when all apps suspended → resumes all immediately
+  - New API endpoints: `POST /keys/lock-all`, `POST /apps/suspend-all`, `POST /apps/resume-all`
+- **Android: Bulk key and app management**
+  - Keys screen: Lock All button (lock icon) with confirmation dialog
+    - Only enabled when lockable keys exist (online + encrypted)
+    - Shows spinner during operation, toast on completion
+  - Apps screen: Suspend/Resume toggle button (pause/play icon)
+    - Pause icon when any apps active → opens SuspendAllAppsSheet with duration picker
+    - Play icon when all apps suspended → resumes all immediately
+    - Duration options: indefinite or until specific date/time with quick buttons (+1h, +8h, Tomorrow)
+- **Android: Centralized constants** (`util/Constants.kt`)
+  - `NetworkConstants`: HTTP timeouts, SSE reconnect delays, retry attempts
+  - `ApiConstants`: Default pagination values
+  - `UiConstants`: Activity list size, countdown interval
+  - `ValidationConstants`: Key name patterns, passphrase limits
+- **Android: Error formatting utility** (`util/ErrorFormatter.kt`)
+  - User-friendly error messages for network errors, HTTP 4xx/5xx, timeouts, SSL issues
+  - Suggested actions for each error type
+  - `isRetryable()` function to determine if an error is transient
+- **Android: HTTP timeout and retry configuration**
+  - Configurable request, connection, and socket timeouts
+  - Automatic retry with exponential backoff for transient errors
+  - Applied to all read operations (getDashboard, getRequests, getKeys, getApps, etc.)
+- **Android: Sensitive data cleanup** (`util/SensitiveDataUtils.kt`)
+  - `ClearSensitiveDataOnDispose` composable clears passphrase fields when sheets close
+  - Applied to CreateKeySheet, KeyDetailSheet, RequestDetailSheet, InactivityLockScreen
+- **Android: Input validation** (`util/InputValidation.kt`)
+  - Validators for key names, daemon URLs, app names, passphrases, nsec keys
+  - Real-time validation feedback in CreateKeySheet
+- **Android: Button debouncing** (`util/Debounce.kt`)
+  - `rememberDebouncedClick()` composable prevents rapid repeated clicks
+
+### Improved
+- **Android: Simplified NostrConnect UI**
+  - Replaced verbose client info box with compact "via relay.example.com and X others" summary
+  - Consistent UX between deep link flow and manual connect flow (Apps → + button)
+  - Reduced visual noise while preserving essential connection information
+- **Android: Refactored connect app components for better maintainability**
+  - Extracted shared components (`KeyOption`, `TrustLevelOption`, `PermissionsBadges`) to `ConnectAppComponents.kt`
+  - `ConnectAppSheet` and `DeepLinkConnectSheet` now share common UI components
+
+## [1.5.1]
+
+### Improved
+- Daemon: Consistent error handling across all routes using centralized utilities
+- Daemon: Input validation applied to all user-provided data (key names, passphrases, URIs)
+- Web UI: useRequests hook is now smaller and more maintainable through composition
+- Android: SSE client uses centralized constants instead of hardcoded delay values
+- Android: SignetService uses centralized constants for countdown ticker interval
+- Android: CreateKeySheet shows real-time validation errors for key name and nsec fields
+- **Unified status indicators across Web UI and Android**
+  - Keys: Green dot = online, Orange dot = locked, Gray dot = offline
+  - Apps: Green dot = active, Gray dot = suspended
+  - Suspended app names now display with muted text
+  - Web UI Apps page shows "Suspended" instead of last active time for suspended apps
+- **System Status widget: "Lock Now" renamed to "Reset"** for consistency with sidebar's "Reset Inactivity Lock" action (both Web UI and Android)
+- Android: KeyDetailSheet layout updated to match KeyCard (status dot + encryption badge instead of lock icon + status text)
+- Android: Removed duplicate key status indicators (lock icon next to name removed, StatusBadge replaced with EncryptionBadge)
+
+### Fixed
+- **Web UI: Inactivity lock countdown stopping after extended periods**
+  - Countdown now calculates remaining time from `lastResetAt` timestamp on each tick
+  - Self-corrects for any drift caused by browser throttling background tabs
+  - Previously, the interval-based decrement would eventually stop updating
+- **Web UI: Clipboard copy not working in non-secure contexts** ([#9](https://github.com/Letdown2491/signet/issues/9))
+  - Fixed regression in ConnectAppModal where "Copy URI" button used `navigator.clipboard.writeText()` directly
+  - Now uses `copyToClipboard()` utility with legacy `execCommand` fallback for HTTP access (e.g., Tailscale IP)
+
+---
+
 ## [1.5.0]
 
 ### Added

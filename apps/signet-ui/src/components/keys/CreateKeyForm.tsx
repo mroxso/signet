@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styles from './KeysPanel.module.css';
 
 interface CreateKeyFormProps {
@@ -12,6 +12,14 @@ export function CreateKeyForm({ creating, onSubmit, onCancel }: CreateKeyFormPro
   const [passphrase, setPassphrase] = useState('');
   const [nsec, setNsec] = useState('');
   const [createMode, setCreateMode] = useState<'generate' | 'import'>('generate');
+
+  // Clear sensitive data (passphrase, nsec) on unmount
+  useEffect(() => {
+    return () => {
+      setPassphrase('');
+      setNsec('');
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

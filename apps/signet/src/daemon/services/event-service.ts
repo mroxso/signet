@@ -1,7 +1,8 @@
 import createDebug from 'debug';
-import type { PendingRequest, ConnectedApp, DashboardStats, KeyInfo, RelayStatusResponse, ActivityEntry } from '@signet/types';
+import type { PendingRequest, ConnectedApp, DashboardStats, KeyInfo, RelayStatusResponse, ActivityEntry, LogEntry } from '@signet/types';
 import type { AdminActivityEntry } from '../repositories/admin-log-repository.js';
 import { getDashboardService } from './dashboard-service.js';
+import { logger } from '../lib/logger.js';
 
 const debug = createDebug('signet:events');
 
@@ -37,6 +38,7 @@ export type ServerEvent =
     | { type: 'deadman:panic'; status: DeadManSwitchStatus }
     | { type: 'deadman:reset'; status: DeadManSwitchStatus }
     | { type: 'deadman:updated'; status: DeadManSwitchStatus }
+    | { type: 'log:entry'; entry: LogEntry }
     | { type: 'ping' };
 
 export type EventCallback = (event: ServerEvent) => void;
@@ -76,7 +78,7 @@ export class EventService {
             try {
                 callback(event);
             } catch (error) {
-                console.error('Error in event subscriber:', error);
+                logger.error('Error in event subscriber', { error: error instanceof Error ? error.message : String(error) });
             }
         }
     }
@@ -226,6 +228,13 @@ export class EventService {
      */
     emitDeadmanUpdated(status: DeadManSwitchStatus): void {
         this.emit({ type: 'deadman:updated', status });
+    }
+
+    /**
+     * Emit a log:entry event for real-time log streaming
+     */
+    emitLogEntry(entry: LogEntry): void {
+        this.emit({ type: 'log:entry', entry });
     }
 }
 

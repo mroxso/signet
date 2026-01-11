@@ -23,6 +23,42 @@
   background: var(--accent-hover);
 }
 
+/* Header Actions */
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.iconButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.iconButton:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  border-color: var(--border-default);
+}
+
+.iconButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rotated {
+  transform: rotate(45deg);
+}
+
 /* Error */
 .error {
   padding: var(--space-3) var(--space-4);
@@ -198,6 +234,11 @@
 .activityDot.active {
   background: var(--success);
   box-shadow: 0 0 6px var(--success);
+}
+
+.activityDot.locked {
+  background: var(--warning);
+  box-shadow: 0 0 6px var(--warning);
 }
 
 .keyName {

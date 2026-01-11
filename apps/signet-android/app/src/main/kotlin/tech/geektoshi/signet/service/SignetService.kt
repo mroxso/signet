@@ -17,6 +17,7 @@ import tech.geektoshi.signet.data.api.SignetApiClient
 import tech.geektoshi.signet.data.model.DeadManSwitchStatus
 import tech.geektoshi.signet.data.repository.EventBusRepository
 import tech.geektoshi.signet.data.repository.SettingsRepository
+import tech.geektoshi.signet.util.UiConstants
 import tech.geektoshi.signet.util.getMethodLabel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -125,7 +126,7 @@ class SignetService : Service() {
         countdownJob?.cancel()
         countdownJob = serviceScope.launch {
             while (isActive) {
-                delay(60_000) // Update every minute
+                delay(UiConstants.COUNTDOWN_TICKER_INTERVAL_MS)
                 deadManSwitchStatus?.let { status ->
                     if (status.enabled && status.panicTriggeredAt == null) {
                         // Decrement remaining time locally

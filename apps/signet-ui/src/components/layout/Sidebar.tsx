@@ -1,11 +1,13 @@
 import React, { useState, useCallback } from 'react';
-import { Home, Smartphone, Key, Activity, Settings, HelpCircle, ChevronDown, ChevronRight, Plus, Lock, LockOpen, Loader2 } from 'lucide-react';
+import { Home, Smartphone, Key, Activity, Settings, HelpCircle, ChevronDown, ChevronRight, Plus, Lock, LockOpen, Loader2, Terminal, Copy, Check } from 'lucide-react';
 import type { KeyInfo, RelayStatusResponse } from '@signet/types';
 import { UnlockKeyModal } from './UnlockKeyModal.js';
 import { DeadManSwitchCard } from './DeadManSwitchCard.js';
+import { copyToClipboard } from '../../lib/clipboard.js';
+import { generateConnectionToken } from '../../lib/api-client.js';
 import styles from './Sidebar.module.css';
 
-export type NavItem = 'home' | 'apps' | 'activity' | 'keys' | 'help' | 'settings';
+export type NavItem = 'home' | 'apps' | 'activity' | 'logs' | 'keys' | 'help' | 'settings';
 
 interface SidebarProps {
   activeNav: NavItem;
@@ -42,6 +44,8 @@ export function Sidebar({
   const [relaysExpanded, setRelaysExpanded] = useState(true);
   const [unlockModalKey, setUnlockModalKey] = useState<string | null>(null);
   const [unlockError, setUnlockError] = useState<string | null>(null);
+  const [copyingKey, setCopyingKey] = useState<string | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const handleLockKey = useCallback(async (e: React.MouseEvent, keyName: string) => {
     e.stopPropagation();
@@ -71,10 +75,32 @@ export function Sidebar({
     setUnlockError(null);
   }, []);
 
+  const handleCopyBunkerUri = useCallback(async (e: React.MouseEvent, keyName: string) => {
+    e.stopPropagation();
+    if (copyingKey) return;
+
+    setCopyingKey(keyName);
+    try {
+      const result = await generateConnectionToken(keyName);
+      if (result.ok && result.bunkerUri) {
+        const success = await copyToClipboard(result.bunkerUri);
+        if (success) {
+          setCopiedKey(keyName);
+          setTimeout(() => setCopiedKey(null), 2000);
+        }
+      }
+    } catch {
+      // Failed to generate or copy - silently fail
+    } finally {
+      setCopyingKey(null);
+    }
+  }, [copyingKey]);
+
   const navItems: { id: NavItem; label: string; icon: React.ReactNode; badge?: number }[] = [
     { id: 'home', label: 'Home', icon: <Home size={18} />, badge: pendingCount > 0 ? pendingCount : undefined },
     { id: 'apps', label: 'Apps', icon: <Smartphone size={18} /> },
     { id: 'activity', label: 'Activity', icon: <Activity size={18} /> },
+    { id: 'logs', label: 'Logs', icon: <Terminal size={18} /> },
   ];
 
   return (
@@ -190,6 +216,25 @@ export function Sidebar({
                         />
                         <span className={styles.keyName}>{key.name}</span>
                       </button>
+                      {/* Copy bunker URI button for online keys */}
+                      {key.status === 'online' && (
+                        <button
+                          type="button"
+                          className={`${styles.copyButton} ${copiedKey === key.name ? styles.copied : ''}`}
+                          onClick={(e) => handleCopyBunkerUri(e, key.name)}
+                          disabled={copyingKey === key.name}
+                          title="Copy bunker URI"
+                          aria-label="Copy bunker URI"
+                        >
+                          {copyingKey === key.name ? (
+                            <Loader2 size={12} className={styles.spinning} />
+                          ) : copiedKey === key.name ? (
+                            <Check size={12} />
+                          ) : (
+                            <Copy size={12} />
+                          )}
+                        </button>
+                      )}
                       {/* Lock button for online encrypted keys */}
                       {key.status === 'online' && key.isEncrypted && onLockKey && (
                         <button

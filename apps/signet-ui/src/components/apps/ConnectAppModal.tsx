@@ -16,6 +16,7 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import type { KeyInfo, TrustLevel } from '@signet/types';
 import { connectViaNostrconnect, generateConnectionToken } from '../../lib/api-client.js';
+import { copyToClipboard } from '../../lib/clipboard.js';
 import {
   parseNostrconnectUri,
   formatPermission,
@@ -159,15 +160,13 @@ export function ConnectAppModal({
     }
   }, [bunkerKeyName]);
 
-  // Copy bunker URI to clipboard
+  // Copy bunker URI to clipboard (with fallback for non-secure contexts)
   const copyBunkerUri = useCallback(async () => {
     if (!bunkerUri) return;
-    try {
-      await navigator.clipboard.writeText(bunkerUri);
+    const success = await copyToClipboard(bunkerUri);
+    if (success) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Clipboard access denied
     }
   }, [bunkerUri]);
 

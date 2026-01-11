@@ -286,7 +286,7 @@
     color: var(--danger);
 }
 
-.lockNowButton {
+.resetButton {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -294,22 +294,22 @@
     width: 100%;
     margin-top: var(--space-3);
     padding: var(--space-2) var(--space-3);
-    background: var(--danger-muted);
+    background: var(--accent-muted);
     border: none;
     border-radius: var(--radius-md);
-    color: var(--danger);
+    color: var(--accent);
     font-size: var(--text-sm);
     font-weight: var(--font-medium);
     cursor: pointer;
     transition: all var(--transition-fast);
 }
 
-.lockNowButton:hover {
-    background: var(--danger);
+.resetButton:hover {
+    background: var(--accent);
     color: white;
 }
 
-/* Lock Now Dialog */
+/* Reset Dialog */
 .dialogOverlay {
     position: fixed;
     inset: 0;
@@ -457,7 +457,7 @@
         min-height: 48px;
     }
 
-    .lockNowButton {
+    .resetButton {
         min-height: 44px;
     }
 

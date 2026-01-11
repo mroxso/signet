@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { getDeadManSwitchService } from '../../services/index.js';
 import type { PreHandlerFull } from '../types.js';
 import { sendError } from '../../lib/route-errors.js';
+import { toErrorMessage } from '../../lib/errors.js';
 
 export function registerDeadManSwitchRoutes(
     fastify: FastifyInstance,
@@ -71,7 +72,7 @@ export function registerDeadManSwitchRoutes(
             return reply.send({ ok: true, status });
         } catch (error) {
             const service = getDeadManSwitchService();
-            const message = (error as Error).message;
+            const message = toErrorMessage(error);
 
             // Include remaining attempts in error response for passphrase failures
             if (message.includes('attempts remaining') || message.includes('Too many failed')) {
@@ -103,7 +104,7 @@ export function registerDeadManSwitchRoutes(
             return reply.send({ ok: true, status });
         } catch (error) {
             const service = getDeadManSwitchService();
-            const message = (error as Error).message;
+            const message = toErrorMessage(error);
 
             if (message.includes('attempts remaining') || message.includes('Too many failed')) {
                 return reply.code(400).send({
@@ -136,7 +137,7 @@ export function registerDeadManSwitchRoutes(
             return reply.send({ ok: true, status });
         } catch (error) {
             const service = getDeadManSwitchService();
-            const message = (error as Error).message;
+            const message = toErrorMessage(error);
 
             if (message.includes('attempts remaining') || message.includes('Too many failed')) {
                 return reply.code(400).send({

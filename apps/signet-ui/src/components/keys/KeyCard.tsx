@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { KeyInfo, ConnectedApp } from '@signet/types';
 import { ChevronDown, ChevronRight, Copy, QrCode, Lock, Unlock, Trash2, Users, Pencil, Shield } from 'lucide-react';
-import { formatRelativeTime, toNpub, isActiveRecently } from '../../lib/formatters.js';
+import { formatRelativeTime, toNpub } from '../../lib/formatters.js';
 import { getTrustLevelInfo } from '../../lib/event-labels.js';
 import { copyToClipboard as copyText } from '../../lib/clipboard.js';
 import { BunkerURIModal } from '../layout/BunkerURIModal.js';
@@ -61,8 +61,6 @@ export function KeyCard({
 
   // Bunker URI modal state
   const [showBunkerModal, setShowBunkerModal] = useState(false);
-
-  const isActive = isActiveRecently(key.lastUsedAt);
 
   const copyToClipboard = async (text: string, field: string) => {
     const success = await copyText(text);
@@ -146,7 +144,10 @@ export function KeyCard({
         aria-expanded={expanded}
       >
         <div className={styles.keyMain}>
-          <span className={`${styles.activityDot} ${isActive ? styles.active : ''}`} />
+          <span className={`${styles.activityDot} ${
+            key.status === 'online' ? styles.active :
+            key.status === 'locked' ? styles.locked : ''
+          }`} />
           <span className={styles.keyName}>{key.name}</span>
           <span className={`${styles.status} ${styles[key.status]}`}>
             {key.status === 'locked' && <Lock size={12} />}

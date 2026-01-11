@@ -44,3 +44,6 @@ export type {
 
 // Health types
 export type { HealthStatus } from './health.js';
+
+// Log types
+export type { LogLevel, LogEntry, LogsResponse, LogFilterParams } from './logs.js';

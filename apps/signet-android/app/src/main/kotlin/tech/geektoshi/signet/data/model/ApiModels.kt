@@ -408,3 +408,43 @@ data class DeadManSwitchActionBody(
     val keyName: String,
     val passphrase: String
 )
+
+// ==================== Bulk Operations ====================
+
+/**
+ * Response from locking all keys
+ */
+@Serializable
+data class LockAllKeysResponse(
+    val ok: Boolean = false,
+    val lockedCount: Int = 0,
+    val error: String? = null
+)
+
+/**
+ * Request body for suspending all apps with optional end time
+ */
+@Serializable
+data class SuspendAllAppsBody(
+    val until: String? = null
+)
+
+/**
+ * Response from suspending all apps
+ */
+@Serializable
+data class SuspendAllAppsResponse(
+    val ok: Boolean = false,
+    val suspendedCount: Int = 0,
+    val error: String? = null
+)
+
+/**
+ * Response from resuming all apps
+ */
+@Serializable
+data class ResumeAllAppsResponse(
+    val ok: Boolean = false,
+    val resumedCount: Int = 0,
+    val error: String? = null
+)

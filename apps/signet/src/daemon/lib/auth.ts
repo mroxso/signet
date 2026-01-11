@@ -265,7 +265,8 @@ export function createAuthMiddleware(fastify: FastifyInstance, requireAuth: bool
         }
 
         // Attach the authenticated user info to the request
-        (request as any).user = payload;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (request as FastifyRequest & { user: JwtPayload }).user = payload;
     };
 }
 

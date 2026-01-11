@@ -63,9 +63,40 @@ All administration is done via the web UI. The following settings are required:
 
 ## Logging
 
+Signet includes structured logging with timestamps, log levels, and optional JSON output.
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `LOG_LEVEL` | Minimum log level: `debug`, `info`, `warn`, `error` | `info` |
+| `LOG_FORMAT` | Output format: `pretty` or `json` | `pretty` |
+
+**Pretty format** (default):
+```
+[2024-01-15T10:30:45.123Z] INFO: Server started {"port":3000}
+```
+
+**JSON format** (for log aggregators):
+```json
+{"time":"2024-01-15T10:30:45.123Z","level":"info","msg":"Server started","port":3000}
+```
+
+### Systemd Log Redirection
+
+When running under systemd, you can append logs to a file:
+
+```ini
+[Service]
+StandardOutput=append:/var/log/signet/daemon.log
+StandardError=append:/var/log/signet/daemon.log
+```
+
+All log entries include ISO timestamps, so you can use the default `LOG_FORMAT=pretty` for human-readable logs with full timestamps.
+
 ### `logs`
 
-Path to the log file.
+Path to the log file (legacy, use environment variables instead).
 
 - **Type**: string
 - **Default**: `./signet.log`
@@ -196,6 +227,8 @@ SIGNET_PORT=3001 UI_PORT=8080 EXTERNAL_URL=https://signet.example.com docker com
 | `DATABASE_URL` | SQLite database path | `file:~/.signet-config/signet.db` |
 | `SIGNET_LOCAL` | Set to `1` for local development (uses relative DB path) | (not set) |
 | `NODE_ENV` | Set to `development` for dev mode | `production` |
+| `LOG_LEVEL` | Log level: `debug`, `info`, `warn`, `error` | `info` |
+| `LOG_FORMAT` | Log format: `pretty` or `json` | `pretty` |
 
 ### UI Variables (`signet-ui`)
 

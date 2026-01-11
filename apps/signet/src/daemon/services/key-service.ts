@@ -1,6 +1,8 @@
 import { generateSecretKey, getPublicKey } from 'nostr-tools/pure';
 import { npubEncode, nsecEncode, decode as nip19Decode } from 'nostr-tools/nip19';
 import { hexToBytes } from '../lib/hex.js';
+import { toErrorMessage } from '../lib/errors.js';
+import { logger } from '../lib/logger.js';
 import type { KeyInfo, KeySummary } from '@signet/types';
 import type { StoredKey } from '../../config/types.js';
 import { encryptSecret, decryptSecret } from '../../config/keyring.js';
@@ -185,7 +187,7 @@ export class KeyService {
             try {
                 await createSkeletonProfile(secretKeyBytes, this.config.nostrRelays);
             } catch (error) {
-                console.log(`Failed to create skeleton profile: ${(error as Error).message}`);
+                logger.warn('Failed to create skeleton profile', { error: toErrorMessage(error) });
             }
         }
 
@@ -308,7 +310,7 @@ export class KeyService {
                     npub = derived.npub;
                     bunkerUri = this.buildBunkerUri(pubkey);
                 } catch (error) {
-                    console.log(`Unable to get info for key ${name}: ${(error as Error).message}`);
+                    logger.warn('Unable to get info for key', { key: name, error: toErrorMessage(error) });
                 }
             } else if (entry?.key) {
                 try {
@@ -320,7 +322,7 @@ export class KeyService {
                     npub = derived.npub;
                     bunkerUri = this.buildBunkerUri(pubkey);
                 } catch (error) {
-                    console.log(`Unable to get info for key ${name}: ${(error as Error).message}`);
+                    logger.warn('Unable to get info for key', { key: name, error: toErrorMessage(error) });
                 }
             }
 
@@ -372,7 +374,7 @@ export class KeyService {
                     tokenCount: stats.tokenCount,
                 });
             } catch (error) {
-                console.log(`Unable to describe key ${name}: ${(error as Error).message}`);
+                logger.warn('Unable to describe key', { key: name, error: toErrorMessage(error) });
             }
 
             remaining.delete(name);

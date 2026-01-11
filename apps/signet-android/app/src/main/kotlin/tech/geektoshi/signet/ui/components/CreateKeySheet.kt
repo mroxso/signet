@@ -35,6 +35,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import tech.geektoshi.signet.data.api.SignetApiClient
+import tech.geektoshi.signet.util.ClearSensitiveDataOnDispose
+import tech.geektoshi.signet.util.InputValidation
+import tech.geektoshi.signet.util.rememberDebouncedClick
 import tech.geektoshi.signet.ui.theme.BgTertiary
 import tech.geektoshi.signet.ui.theme.BorderDefault
 import tech.geektoshi.signet.ui.theme.Danger
@@ -57,16 +60,28 @@ fun CreateKeySheet(
     var error by remember { mutableStateOf<String?>(null) }
 
     var keyName by remember { mutableStateOf("") }
-    var passphrase by remember { mutableStateOf("") }
-    var confirmPassphrase by remember { mutableStateOf("") }
+    val passphraseState = remember { mutableStateOf("") }
+    var passphrase by passphraseState
+    val confirmPassphraseState = remember { mutableStateOf("") }
+    var confirmPassphrase by confirmPassphraseState
     var usePassphrase by remember { mutableStateOf(false) }
     var importExisting by remember { mutableStateOf(false) }
-    var nsec by remember { mutableStateOf("") }
+    val nsecState = remember { mutableStateOf("") }
+    var nsec by nsecState
+
+    // Clear sensitive data when sheet is dismissed
+    ClearSensitiveDataOnDispose(passphraseState, confirmPassphraseState, nsecState)
 
     val passphraseMatch = passphrase == confirmPassphrase
+
+    // Real-time validation
+    val keyNameValidation = if (keyName.isNotBlank()) InputValidation.validateKeyName(keyName) else null
+    val nsecValidation = if (importExisting && nsec.isNotBlank()) InputValidation.validateNsec(nsec) else null
+
     val canCreate = keyName.isNotBlank() &&
+            (keyNameValidation?.isValid ?: false) &&
             (!usePassphrase || (passphrase.isNotBlank() && passphraseMatch)) &&
-            (!importExisting || nsec.isNotBlank())
+            (!importExisting || (nsec.isNotBlank() && (nsecValidation?.isValid ?: true)))
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -101,10 +116,12 @@ fun CreateKeySheet(
                 onValueChange = { keyName = it },
                 placeholder = { Text("Enter a name for this key") },
                 singleLine = true,
+                isError = keyNameValidation?.isValid == false,
+                supportingText = keyNameValidation?.errorMessage?.let { { Text(it, color = Danger) } },
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = SignetPurple,
-                    unfocusedBorderColor = BorderDefault,
+                    focusedBorderColor = if (keyNameValidation?.isValid == false) Danger else SignetPurple,
+                    unfocusedBorderColor = if (keyNameValidation?.isValid == false) Danger else BorderDefault,
                     cursorColor = SignetPurple,
                     focusedTextColor = TextPrimary,
                     unfocusedTextColor = TextPrimary,
@@ -150,10 +167,12 @@ fun CreateKeySheet(
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    isError = nsecValidation?.isValid == false,
+                    supportingText = nsecValidation?.errorMessage?.let { { Text(it, color = Danger) } },
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = SignetPurple,
-                        unfocusedBorderColor = BorderDefault,
+                        focusedBorderColor = if (nsecValidation?.isValid == false) Danger else SignetPurple,
+                        unfocusedBorderColor = if (nsecValidation?.isValid == false) Danger else BorderDefault,
                         cursorColor = SignetPurple,
                         focusedTextColor = TextPrimary,
                         unfocusedTextColor = TextPrimary,

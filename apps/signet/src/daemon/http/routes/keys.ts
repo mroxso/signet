@@ -5,6 +5,7 @@ import type { PreHandlerFull } from '../types.js';
 import { sendError } from '../../lib/route-errors.js';
 import { adminLogRepository } from '../../repositories/admin-log-repository.js';
 import { getClientInfo } from '../../lib/client-info.js';
+import { validateKeyName, validatePassphrase, sanitizeString } from '../../lib/validation.js';
 
 export interface KeysRouteConfig {
     keyService: KeyService;
@@ -25,13 +26,21 @@ export function registerKeysRoutes(
     fastify.post('/keys', { preHandler: [...preHandler.rateLimit, ...preHandler.auth, ...preHandler.csrf] }, async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as { keyName?: string; passphrase?: string; nsec?: string };
 
-        if (!body.keyName) {
-            return reply.code(400).send({ error: 'keyName is required' });
+        // Validate key name
+        const keyNameResult = validateKeyName(body.keyName);
+        if (!keyNameResult.valid) {
+            return reply.code(400).send({ error: keyNameResult.error });
+        }
+
+        // Validate passphrase length
+        const passphraseResult = validatePassphrase(body.passphrase);
+        if (!passphraseResult.valid) {
+            return reply.code(400).send({ error: passphraseResult.error });
         }
 
         try {
             const key = await config.keyService.createKey({
-                keyName: body.keyName,
+                keyName: sanitizeString(body.keyName),
                 passphrase: body.passphrase,
                 nsec: body.nsec,
             });
@@ -52,6 +61,11 @@ export function registerKeysRoutes(
 
         if (!passphrase) {
             return reply.code(400).send({ error: 'passphrase is required' });
+        }
+
+        const passphraseResult = validatePassphrase(passphrase);
+        if (!passphraseResult.valid) {
+            return reply.code(400).send({ error: passphraseResult.error });
         }
 
         try {
@@ -113,6 +127,11 @@ export function registerKeysRoutes(
             return reply.code(400).send({ error: 'passphrase is required' });
         }
 
+        const passphraseResult = validatePassphrase(passphrase);
+        if (!passphraseResult.valid) {
+            return reply.code(400).send({ error: passphraseResult.error });
+        }
+
         try {
             await config.keyService.setPassphrase(keyName, passphrase);
             return reply.send({ ok: true });
@@ -126,12 +145,14 @@ export function registerKeysRoutes(
         const { keyName } = request.params as { keyName: string };
         const { newName } = request.body as { newName?: string };
 
-        if (!newName || !newName.trim()) {
-            return reply.code(400).send({ error: 'newName is required' });
+        // Validate new key name
+        const keyNameResult = validateKeyName(newName);
+        if (!keyNameResult.valid) {
+            return reply.code(400).send({ error: keyNameResult.error });
         }
 
         try {
-            await config.keyService.renameKey(keyName, newName.trim());
+            await config.keyService.renameKey(keyName, sanitizeString(newName));
             return reply.send({ ok: true });
         } catch (error) {
             return sendError(reply, error);
@@ -153,6 +174,31 @@ export function registerKeysRoutes(
                 ok: true,
                 revokedApps: result.revokedApps,
             });
+        } catch (error) {
+            return sendError(reply, error);
+        }
+    });
+
+    // Lock all active encrypted keys (POST - needs CSRF)
+    fastify.post('/keys/lock-all', { preHandler: [...preHandler.auth, ...preHandler.csrf] }, async (request: FastifyRequest, reply: FastifyReply) => {
+        try {
+            const lockedKeys = config.keyService.lockAllKeys();
+
+            // Log admin events for each locked key
+            const clientInfo = getClientInfo(request);
+            for (const keyName of lockedKeys) {
+                const adminLog = await adminLogRepository.create({
+                    eventType: 'key_locked',
+                    keyName,
+                    ...clientInfo,
+                });
+                getEventService().emitAdminEvent(adminLogRepository.toActivityEntry(adminLog));
+            }
+
+            // Emit stats update (active key count changed)
+            await emitCurrentStats();
+
+            return reply.send({ ok: true, lockedCount: lockedKeys.length });
         } catch (error) {
             return sendError(reply, error);
         }

@@ -216,16 +216,16 @@ fun HomeScreen(
             uiStatus = health.toUIStatus(),
             deadManSwitchStatus = deadManSwitchStatus,
             keys = keys,
-            onLockNow = { keyName, passphrase ->
+            onReset = { keyName, passphrase ->
                 try {
                     val client = SignetApiClient(daemonUrl)
-                    val result = client.testDeadManSwitchPanic(keyName, passphrase)
+                    val result = client.resetDeadManSwitch(keyName, passphrase)
                     client.close()
                     if (result.ok) {
                         result.status?.let { deadManSwitchStatus = it }
                         Result.success(Unit)
                     } else {
-                        Result.failure(Exception(result.error ?: "Failed to trigger panic"))
+                        Result.failure(Exception(result.error ?: "Failed to reset timer"))
                     }
                 } catch (e: Exception) {
                     Result.failure(e)
@@ -469,7 +469,7 @@ private fun StatCard(
         ) {
             Text(
                 text = value,
-                style = MaterialTheme.typography.headlineLarge,
+                style = MaterialTheme.typography.headlineMedium,
                 color = TextPrimary
             )
             Spacer(modifier = Modifier.height(4.dp))
