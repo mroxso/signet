@@ -77,16 +77,20 @@ class MainActivity : FragmentActivity() {
             val batteryPromptShown by settingsRepository.batteryPromptShown.collectAsState(initial = true)
             val appLockEnabled by settingsRepository.appLockEnabled.collectAsState(initial = false)
             val lockTimeoutMinutes by settingsRepository.lockTimeoutMinutes.collectAsState(initial = 1)
+            val lastActivityTimestamp by settingsRepository.lastActivityTimestamp.collectAsState(initial = 0L)
             val scope = rememberCoroutineScope()
 
             var showBatteryDialog by remember { mutableStateOf(false) }
             var isUnlocked by remember { mutableStateOf(false) }
             var backgroundTimestamp by remember { mutableLongStateOf(0L) }
 
-            // When user enables app lock while in app, consider them already unlocked
-            LaunchedEffect(appLockEnabled) {
-                if (appLockEnabled) {
-                    isUnlocked = true
+            // Check on startup if we should auto-unlock based on persisted timestamp
+            LaunchedEffect(appLockEnabled, lockTimeoutMinutes, lastActivityTimestamp) {
+                if (appLockEnabled && lockTimeoutMinutes > 0 && lastActivityTimestamp > 0 && !isUnlocked) {
+                    val elapsedMinutes = (System.currentTimeMillis() - lastActivityTimestamp) / 60_000
+                    if (elapsedMinutes < lockTimeoutMinutes) {
+                        isUnlocked = true
+                    }
                 }
             }
 
@@ -97,6 +101,10 @@ class MainActivity : FragmentActivity() {
                     when (event) {
                         Lifecycle.Event.ON_PAUSE -> {
                             backgroundTimestamp = System.currentTimeMillis()
+                            // Persist timestamp for app close/reopen scenario
+                            scope.launch {
+                                settingsRepository.setLastActivityTimestamp(backgroundTimestamp)
+                            }
                         }
                         Lifecycle.Event.ON_RESUME -> {
                             if (appLockEnabled && isUnlocked && backgroundTimestamp > 0) {

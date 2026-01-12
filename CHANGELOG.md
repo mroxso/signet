@@ -3,6 +3,13 @@
 ## [1.6.1]
 
 ### Fixed
+- **Android: Biometric unlock button unresponsive after cancellation** ([#39](https://github.com/Letdown2491/signet/issues/39))
+  - Pressing "Unlock" after dismissing the biometric prompt did nothing
+  - Changed from boolean flag to counter so each button press triggers a new prompt
+- **Android: Force-close bypassed app lock requirement** ([#39](https://github.com/Letdown2491/signet/issues/39))
+  - App lock was incorrectly bypassed when force-closing and reopening the app
+  - Now persists last activity timestamp to survive app restarts
+  - Timeout setting (immediately, 1 min, 5 min, 15 min) now works correctly for both backgrounding and closing the app
 - **Daemon: Memory leak in AdminCommandService (kill switch)**
   - WebSocket event listeners were not removed when connections closed during refresh cycles
   - Each refresh created new connections with 4 event handlers that kept references to captured variables
