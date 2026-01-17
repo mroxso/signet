@@ -1,7 +1,10 @@
 import type { Event } from 'nostr-tools/pure';
+import createDebug from 'debug';
 import prisma from '../../db.js';
 import { ACL_CACHE_TTL_MS, ACL_CACHE_MAX_SIZE } from '../constants.js';
 import { TTLCache } from './ttl-cache.js';
+
+const debug = createDebug('signet:acl');
 
 export type RpcMethod =
     | 'connect'
@@ -332,7 +335,13 @@ export async function checkRequestPermission(
         });
 
         if (!keyUser) {
-            return { permitted: undefined, autoApproved: false };
+            // Unknown client - only allow 'connect' requests to proceed to authorization
+            // All other requests from unknown clients are rejected immediately
+            // This prevents request floods from clients that haven't connected yet
+            if (method === 'connect') {
+                return { permitted: undefined, autoApproved: false };
+            }
+            return { permitted: false, autoApproved: false };
         }
 
         // Check if user is revoked
@@ -399,8 +408,9 @@ export async function checkRequestPermission(
         prisma.keyUser.update({
             where: { id: keyUserId },
             data: { lastUsedAt: new Date() },
-        }).catch(() => {
-            // Ignore errors on lastUsedAt update
+        }).catch((error) => {
+            // Log at debug level - this is non-critical but shouldn't be completely silent
+            debug('Failed to update lastUsedAt for keyUser %d: %s', keyUserId, error?.message ?? error);
         });
         return { permitted: true, autoApproved: true, approvalType: 'auto_trust', keyUserId };
     }

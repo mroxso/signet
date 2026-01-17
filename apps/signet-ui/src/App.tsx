@@ -39,6 +39,7 @@ function AppContent() {
   const [detailsModalRequest, setDetailsModalRequest] = useState<DisplayRequest | null>(null);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [connectAppModalOpen, setConnectAppModalOpen] = useState(false);
+  const [showCreateKeyForm, setShowCreateKeyForm] = useState(false);
   const [selectedKeyName, setSelectedKeyName] = useState<string | null>(null);
   const [showAutoApproved, setShowAutoApproved] = useState(true);
   const [appNames, setAppNames] = useState<Record<string, string>>({});
@@ -136,6 +137,12 @@ function AppContent() {
   // Handle navigation changes
   const handleNavChange = useCallback((nav: NavItem) => {
     setActiveNav(nav);
+  }, []);
+
+  // Handle add key from sidebar
+  const handleAddKey = useCallback(() => {
+    setActiveNav('keys');
+    setShowCreateKeyForm(true);
   }, []);
 
   // Switch request filter based on active page
@@ -376,6 +383,10 @@ function AppContent() {
             lockingAll={keys.lockingAll}
             renaming={keys.renaming}
             settingPassphrase={keys.settingPassphrase}
+            encrypting={keys.encrypting}
+            migrating={keys.migrating}
+            exporting={keys.exporting}
+            forceShowCreateForm={showCreateKeyForm}
             onCreateKey={keys.createKey}
             onDeleteKey={keys.deleteKey}
             onUnlockKey={keys.unlockKey}
@@ -392,7 +403,11 @@ function AppContent() {
             }}
             onRenameKey={keys.renameKey}
             onSetPassphrase={keys.setPassphrase}
+            onEncryptKey={keys.encryptKey}
+            onMigrateKey={keys.migrateKey}
+            onExportKey={keys.exportKey}
             onClearError={keys.clearError}
+            onCreateFormClose={() => setShowCreateKeyForm(false)}
           />
         );
 
@@ -429,6 +444,7 @@ function AppContent() {
       onLockKey={keys.lockKey}
       onUnlockKey={keys.unlockKey}
       onConnectApp={() => setConnectAppModalOpen(true)}
+      onAddKey={handleAddKey}
     >
       {renderContent()}
 

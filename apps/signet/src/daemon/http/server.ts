@@ -37,6 +37,7 @@ export interface HealthStatus {
     sseClients: number;
     lastPoolReset: string | null;
     caches?: Record<string, { size: number; hits: number; misses: number; evictions: number }>;
+    logBuffer?: { entries: number; maxEntries: number; estimatedKB: number };
 }
 
 export interface HttpServerConfig {

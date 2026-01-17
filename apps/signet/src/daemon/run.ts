@@ -12,6 +12,7 @@ import { TTLCache, getAllCacheStats } from './lib/ttl-cache.js';
 import { extractEventKind } from './lib/parse.js';
 import { toErrorMessage } from './lib/errors.js';
 import { logger, setLogEntryEmitter } from './lib/logger.js';
+import { logBuffer } from './lib/log-buffer.js';
 import {
     KeyService,
     RequestService,
@@ -23,6 +24,7 @@ import {
     setEventService,
     getEventService,
     setDashboardService,
+    setHealthStatusGetter,
     emitCurrentStats,
     getConnectionTokenService,
     AdminCommandService,
@@ -79,6 +81,7 @@ const LOG_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 // Health monitoring constants
 const HEALTH_LOG_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+const HEALTH_SSE_INTERVAL_MS = 10 * 1000; // 10 seconds - real-time health updates via SSE
 
 // Rate limiting for auto-approval logging: 1 log per method per 5 seconds per app
 // Using TTLCache ensures automatic cleanup of old entries
@@ -275,6 +278,7 @@ class Daemon {
         // Initialize event service for real-time updates
         this.eventService = new EventService();
         setEventService(this.eventService);
+        setHealthStatusGetter(() => this.getHealthStatus());
 
         // Wire up logger to emit SSE events for real-time log streaming
         setLogEntryEmitter((entry) => this.eventService.emitLogEntry(entry));
@@ -411,6 +415,11 @@ class Daemon {
             this.logHealthStatus();
         }, HEALTH_LOG_INTERVAL_MS);
 
+        // Schedule periodic health SSE updates for real-time monitoring
+        setInterval(() => {
+            this.eventService.emitHealthUpdated(this.getHealthStatus());
+        }, HEALTH_SSE_INTERVAL_MS);
+
         // Log initial health status after a short delay
         setTimeout(() => {
             this.logHealthStatus();
@@ -439,6 +448,7 @@ class Daemon {
         const keyStats = this.keyService.getKeyStats();
         const relayConnected = this.pool.getConnectedCount();
         const relayTotal = this.pool.getRelays().length;
+        const logStats = logBuffer.getStats();
 
         return {
             status: relayConnected > 0 ? 'ok' : 'degraded',
@@ -460,6 +470,11 @@ class Daemon {
             sseClients: this.eventService.getSubscriberCount(),
             lastPoolReset: this.lastPoolReset?.toISOString() ?? null,
             caches: getAllCacheStats(),
+            logBuffer: {
+                entries: logStats.entries,
+                maxEntries: logStats.maxEntries,
+                estimatedKB: Math.round(logStats.estimatedBytes / 1024),
+            },
         };
     }
 

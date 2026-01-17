@@ -1,5 +1,69 @@
 # Changelog
 
+## [1.7.0]
+
+### Added
+- **NIP-49 encryption support**: Industry-standard key encryption using XChaCha20-Poly1305 with scrypt KDF
+  - New keys can be encrypted with NIP-49 (recommended) or legacy AES-256-GCM format
+  - Import existing `ncryptsec` keys directly without re-encryption
+  - Interactive encryption format selection during key creation (web UI and CLI)
+- **Key export functionality**: Export keys for backup or migration
+  - Choose between NIP-49 (ncryptsec) or plaintext (nsec) format
+  - Downloads as a text file with key name, npub, and secret
+  - Requires passphrase verification for encrypted keys
+- **Key encryption migration**: Upgrade existing keys from legacy to NIP-49 encryption
+  - "Migrate to NIP-49" option in key details for legacy-encrypted keys
+  - Requires current passphrase and new passphrase confirmation
+  - Logged as `key_migrated` admin event for audit trail
+- **CLI encryption flags**: Non-interactive key management
+  - `signet add --nip49`: Use NIP-49 encryption (recommended)
+  - `signet add --legacy`: Use legacy AES-256-GCM encryption
+  - `signet add --no-encrypt`: Store key unencrypted (not recommended)
+  - Interactive prompt when no flag specified (defaults to NIP-49)
+- **New admin event types**: Extended activity tracking
+  - `key_encrypted`: Key encryption applied during creation
+  - `key_migrated`: Key encryption migrated to NIP-49
+  - `key_exported`: Key exported (ncryptsec or nsec)
+  - `auth_failed`: Authentication failure
+  - `panic_triggered`: Dead man switch panic triggered
+  - `deadman_reset`: Inactivity timer reset
+- **NIP-49 unit tests**: Spec test vector verification for encryption/decryption
+- **Health endpoint: Log buffer stats**: `/health` now includes log buffer memory usage
+  - Shows entries count, max capacity, and estimated memory in KB
+  - Helps monitor in-memory log buffer overhead
+
+### Improved
+- **Web UI: Key details redesign**
+  - Connected Apps section now collapsible with count badge (replaces "Show X more" pattern)
+  - Export section uses expandable label pattern (cleaner than separate label + button)
+  - Removed redundant "Online"/"Locked" text badges (status dot is sufficient)
+- **Web UI: Sidebar + button** now opens create key form and navigates to Keys page
+- **Human-readable admin event labels**: All admin events now display user-friendly text
+  - `key_migrated` → "Encryption migrated"
+  - `key_exported` → "Key exported"
+  - `panic_triggered` → "Panic triggered"
+  - `deadman_reset` → "Inactivity timer reset"
+- **Android: Admin event labels** updated to match web UI
+- **Web UI: Real-time system status** via SSE (no polling)
+  - Backend emits `health:updated` every 10 seconds for metrics (memory, uptime)
+  - Key operations (unlock, lock, create, delete) emit health updates instantly
+  - ~50% less bandwidth than polling (SSE messages vs HTTP requests)
+  - Initial fetch on page load, then SSE-only
+
+### Fixed
+- **Key export**: Fixed response format mismatch causing export button to appear non-functional
+- **Import ncryptsec**: Fixed incorrect passphrase confirmation requirement when importing already-encrypted keys
+- **Delete unlocked key**: Fixed "passphrase required" error when deleting an already-unlocked encrypted key
+- **Memory leak: Rate limit store**: Replaced unbounded Map with TTLCache
+  - Under high traffic, the rate limit store could grow indefinitely since cleanup only ran every 60s
+  - Now uses TTLCache with 10,000 max entries, automatic cleanup every 30s, and LRU eviction
+  - TTL set to block duration + window to ensure blocked entries persist appropriately
+
+### Dependencies
+- **nostr-tools**: Upgraded from 2.17.0 to 2.19.4 for bug fixes and memory improvements
+
+---
+
 ## [1.6.2]
 
 ### Fixed

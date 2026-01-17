@@ -1,11 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import type { KeyInfo, ConnectedApp } from '@signet/types';
 import { LoadingSpinner } from '../shared/LoadingSpinner.js';
 import { ConfirmDialog } from '../shared/ConfirmDialog.js';
 import { QRModal } from '../shared/QRModal.js';
 import { PageHeader } from '../shared/PageHeader.js';
 import { Key, Lock, Plus, Loader2 } from 'lucide-react';
-import { CreateKeyForm } from './CreateKeyForm.js';
+import { CreateKeyModal } from './CreateKeyModal.js';
 import { KeyCard } from './KeyCard.js';
 import styles from './KeysPanel.module.css';
 
@@ -21,6 +21,10 @@ interface KeysPanelProps {
   lockingAll: boolean;
   renaming: boolean;
   settingPassphrase: boolean;
+  encrypting: boolean;
+  migrating: boolean;
+  exporting: boolean;
+  forceShowCreateForm?: boolean;
   onCreateKey: (data: { keyName: string; passphrase?: string; nsec?: string }) => Promise<KeyInfo | null>;
   onDeleteKey: (keyName: string, passphrase?: string) => Promise<{ success: boolean; revokedApps?: number }>;
   onUnlockKey: (keyName: string, passphrase: string) => Promise<boolean>;
@@ -28,7 +32,11 @@ interface KeysPanelProps {
   onLockAllKeys: () => Promise<{ success: boolean; lockedCount?: number }>;
   onRenameKey: (keyName: string, newName: string) => Promise<boolean>;
   onSetPassphrase: (keyName: string, passphrase: string) => Promise<boolean>;
+  onEncryptKey: (keyName: string, encryption: 'nip49' | 'legacy', passphrase: string, confirmPassphrase: string) => Promise<boolean>;
+  onMigrateKey: (keyName: string, passphrase: string) => Promise<boolean>;
+  onExportKey: (keyName: string, format: 'nsec' | 'nip49', currentPassphrase?: string, exportPassphrase?: string, confirmExportPassphrase?: string) => Promise<{ key?: string; format?: 'nsec' | 'ncryptsec' } | null>;
   onClearError: () => void;
+  onCreateFormClose?: () => void;
 }
 
 export function KeysPanel({
@@ -43,6 +51,10 @@ export function KeysPanel({
   lockingAll,
   renaming,
   settingPassphrase,
+  encrypting,
+  migrating,
+  exporting,
+  forceShowCreateForm,
   onCreateKey,
   onDeleteKey,
   onUnlockKey,
@@ -50,7 +62,11 @@ export function KeysPanel({
   onLockAllKeys,
   onRenameKey,
   onSetPassphrase,
+  onEncryptKey,
+  onMigrateKey,
+  onExportKey,
   onClearError,
+  onCreateFormClose,
 }: KeysPanelProps) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -58,6 +74,14 @@ export function KeysPanel({
   const [deletePassphrase, setDeletePassphrase] = useState('');
   const [qrModal, setQrModal] = useState<{ value: string; title: string } | null>(null);
   const [showLockAllConfirm, setShowLockAllConfirm] = useState(false);
+
+  // Respond to external trigger to show create form
+  useEffect(() => {
+    if (forceShowCreateForm) {
+      setShowCreateForm(true);
+      onClearError();
+    }
+  }, [forceShowCreateForm, onClearError]);
 
   // Count lockable keys (online + encrypted)
   const lockableKeysCount = useMemo(() =>
@@ -79,6 +103,7 @@ export function KeysPanel({
     const result = await onCreateKey(data);
     if (result) {
       setShowCreateForm(false);
+      onCreateFormClose?.();
       return true;
     }
     return false;
@@ -160,13 +185,13 @@ export function KeysPanel({
               type="button"
               className={styles.iconButton}
               onClick={() => {
-                setShowCreateForm(!showCreateForm);
+                setShowCreateForm(true);
                 onClearError();
               }}
-              title={showCreateForm ? 'Cancel' : 'Add key'}
-              aria-label={showCreateForm ? 'Cancel' : 'Add key'}
+              title="Add key"
+              aria-label="Add key"
             >
-              <Plus size={16} className={showCreateForm ? styles.rotated : ''} />
+              <Plus size={16} />
             </button>
           </div>
         }
@@ -174,13 +199,15 @@ export function KeysPanel({
 
       {error && <div className={styles.error}>{error}</div>}
 
-      {showCreateForm && (
-        <CreateKeyForm
-          creating={creating}
-          onSubmit={handleCreateKey}
-          onCancel={() => setShowCreateForm(false)}
-        />
-      )}
+      <CreateKeyModal
+        open={showCreateForm}
+        creating={creating}
+        onSubmit={handleCreateKey}
+        onClose={() => {
+          setShowCreateForm(false);
+          onCreateFormClose?.();
+        }}
+      />
 
       {keys.length === 0 ? (
         <div className={styles.emptyState}>
@@ -203,11 +230,17 @@ export function KeysPanel({
               locking={locking}
               renaming={renaming}
               settingPassphrase={settingPassphrase}
+              encrypting={encrypting}
+              migrating={migrating}
+              exporting={exporting}
               onToggleExpand={() => handleToggleExpand(key.name)}
               onUnlock={(passphrase) => onUnlockKey(key.name, passphrase)}
               onLock={() => onLockKey(key.name)}
               onRename={(newName) => handleRename(key.name, newName)}
               onSetPassphrase={(passphrase) => onSetPassphrase(key.name, passphrase)}
+              onEncrypt={(encryption, passphrase, confirmPassphrase) => onEncryptKey(key.name, encryption, passphrase, confirmPassphrase)}
+              onMigrate={(passphrase) => onMigrateKey(key.name, passphrase)}
+              onExport={(format, currentPassphrase, exportPassphrase, confirmExportPassphrase) => onExportKey(key.name, format, currentPassphrase, exportPassphrase, confirmExportPassphrase)}
               onDelete={() => handleDeleteClick(key)}
               onShowQR={(value, title) => setQrModal({ value, title })}
               onClearError={onClearError}
