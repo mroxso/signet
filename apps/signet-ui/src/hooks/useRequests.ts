@@ -1,13 +1,16 @@
-import { useState, useCallback, useEffect } from 'react';
-import type { PendingRequest, PendingRequestWire, RequestFilter, DisplayRequest, RequestMeta, TrustLevel } from '@signet/types';
+import { useState, useCallback, useEffect, useMemo } from 'react';
+import type { PendingRequest, PendingRequestWire, DisplayRequest, RequestMeta, TrustLevel, RequestFilter } from '@signet/types';
 import { apiGet, apiPost, apiDelete } from '../lib/api-client.js';
 import { buildErrorMessage, formatRelativeTime, toNpub } from '../lib/formatters.js';
 import { useSSESubscription } from '../contexts/ServerEventsContext.js';
 import type { ServerEvent } from './useServerEvents.js';
+import { useRequestFilters, type SortBy } from './useRequestFilters.js';
+import { useRequestSelection } from './useRequestSelection.js';
 
 const REQUEST_LIMIT = 10;
 
-export type SortBy = 'newest' | 'oldest' | 'expiring';
+// Re-export SortBy for backward compatibility
+export type { SortBy } from './useRequestFilters.js';
 
 interface UseRequestsResult {
   requests: DisplayRequest[];
@@ -41,21 +44,27 @@ interface UseRequestsResult {
 }
 
 export function useRequests(): UseRequestsResult {
+  // Core data state
   const [requests, setRequests] = useState<PendingRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
-  const [filter, setFilter] = useState<RequestFilter>('all');
   const [offset, setOffset] = useState(0);
+
+  // Password and meta state (sensitive data)
   const [passwords, setPasswords] = useState<Record<string, string>>({});
   const [meta, setMeta] = useState<Record<string, RequestMeta>>({});
-  const [now, setNow] = useState(() => Date.now());
-  const [selectionMode, setSelectionMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Bulk operation state
   const [bulkApproving, setBulkApproving] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<SortBy>('newest');
+
+  // Current time for TTL calculations
+  const [now, setNow] = useState(() => Date.now());
+
+  // Compose filter and selection hooks
+  const filters = useRequestFilters();
+  const selection = useRequestSelection();
 
   // Update now every second
   useEffect(() => {
@@ -63,6 +72,7 @@ export function useRequests(): UseRequestsResult {
     return () => clearInterval(timer);
   }, []);
 
+  // Data fetching
   const fetchRequests = useCallback(async (status: RequestFilter, offsetVal: number, append: boolean) => {
     const response = await apiGet<{ requests?: PendingRequestWire[] }>(
       `/requests?limit=${REQUEST_LIMIT}&status=${status}&offset=${offsetVal}`
@@ -87,25 +97,25 @@ export function useRequests(): UseRequestsResult {
 
   const refresh = useCallback(async () => {
     try {
-      await fetchRequests(filter, 0, false);
+      await fetchRequests(filters.filter, 0, false);
       setError(null);
     } catch (err) {
       setError(buildErrorMessage(err, 'Unable to refresh requests'));
     }
-  }, [filter, fetchRequests]);
+  }, [filters.filter, fetchRequests]);
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return;
     setLoadingMore(true);
     try {
-      await fetchRequests(filter, offset, true);
+      await fetchRequests(filters.filter, offset, true);
       setOffset(prev => prev + REQUEST_LIMIT);
     } catch (err) {
       console.error('Failed to load more requests:', err);
     } finally {
       setLoadingMore(false);
     }
-  }, [loadingMore, hasMore, filter, offset, fetchRequests]);
+  }, [loadingMore, hasMore, filters.filter, offset, fetchRequests]);
 
   // Initial load and filter change
   useEffect(() => {
@@ -116,7 +126,7 @@ export function useRequests(): UseRequestsResult {
 
     const load = async () => {
       try {
-        await fetchRequests(filter, 0, false);
+        await fetchRequests(filters.filter, 0, false);
         if (!cancelled) setError(null);
       } catch (err) {
         if (!cancelled) setError(buildErrorMessage(err, 'Unable to load requests'));
@@ -130,7 +140,7 @@ export function useRequests(): UseRequestsResult {
     return () => {
       cancelled = true;
     };
-  }, [filter, fetchRequests]);
+  }, [filters.filter, fetchRequests]);
 
   // Subscribe to SSE events for real-time updates
   const handleSSEEvent = useCallback((event: ServerEvent) => {
@@ -172,10 +182,18 @@ export function useRequests(): UseRequestsResult {
     });
   }, [requests]);
 
+  // Clear sensitive data (passwords) on unmount
+  useEffect(() => {
+    return () => {
+      setPasswords({});
+    };
+  }, []);
+
   const setPassword = useCallback((id: string, password: string) => {
     setPasswords(prev => ({ ...prev, [id]: password }));
   }, []);
 
+  // Approval and denial operations
   const approve = useCallback(async (id: string, trustLevel?: TrustLevel, alwaysAllow?: boolean, allowKind?: number, appName?: string) => {
     const request = requests.find(r => r.id === id);
     const requiresPassword = request?.requiresPassword ?? false;
@@ -252,92 +270,45 @@ export function useRequests(): UseRequestsResult {
   }, [refresh]);
 
   // Decorate requests with computed fields
-  const decoratedRequests: DisplayRequest[] = requests.map(request => {
-    const expires = Date.parse(request.expiresAt);
-    const ttl = Number.isFinite(expires)
-      ? Math.max(0, Math.round((expires - now) / 1000))
-      : Math.max(0, request.ttlSeconds);
+  const decoratedRequests: DisplayRequest[] = useMemo(() => {
+    return requests.map(request => {
+      const expires = Date.parse(request.expiresAt);
+      const ttl = Number.isFinite(expires)
+        ? Math.max(0, Math.round((expires - now) / 1000))
+        : Math.max(0, request.ttlSeconds);
 
-    let state: DisplayRequest['state'];
-    if (request.allowed === true) {
-      state = 'approved';
-    } else if (request.allowed === false) {
-      state = 'denied';
-    } else if (ttl === 0) {
-      state = 'expired';
-    } else {
-      state = 'pending';
-    }
-
-    return {
-      ...request,
-      ttl,
-      npub: toNpub(request.remotePubkey),
-      createdLabel: formatRelativeTime(request.createdAt, now),
-      state,
-      approvedAt: request.processedAt ?? undefined
-    };
-  });
-
-  // Filter by search query
-  const filteredRequests = decoratedRequests.filter(request => {
-    if (!searchQuery.trim()) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      request.method.toLowerCase().includes(query) ||
-      request.npub.toLowerCase().includes(query) ||
-      (request.keyName?.toLowerCase().includes(query) ?? false) ||
-      (request.appName?.toLowerCase().includes(query) ?? false) ||
-      (request.eventPreview?.kind.toString().includes(query) ?? false)
-    );
-  });
-
-  // Sort requests
-  const sortedRequests = [...filteredRequests].sort((a, b) => {
-    switch (sortBy) {
-      case 'oldest':
-        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      case 'expiring':
-        return a.ttl - b.ttl;
-      case 'newest':
-      default:
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    }
-  });
-
-  // Selection handlers
-  const toggleSelectionMode = useCallback(() => {
-    setSelectionMode(prev => !prev);
-    setSelectedIds(new Set());
-  }, []);
-
-  const toggleSelection = useCallback((id: string) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
+      let state: DisplayRequest['state'];
+      if (request.allowed === true) {
+        state = 'approved';
+      } else if (request.allowed === false) {
+        state = 'denied';
+      } else if (ttl === 0) {
+        state = 'expired';
       } else {
-        next.add(id);
+        state = 'pending';
       }
-      return next;
+
+      return {
+        ...request,
+        ttl,
+        npub: toNpub(request.remotePubkey),
+        createdLabel: formatRelativeTime(request.createdAt, now),
+        state,
+        approvedAt: request.processedAt ?? undefined
+      };
     });
-  }, []);
+  }, [requests, now]);
 
-  const selectAll = useCallback(() => {
-    const pendingIds = sortedRequests
-      .filter(r => r.state === 'pending')
-      .map(r => r.id);
-    setSelectedIds(new Set(pendingIds));
-  }, [sortedRequests]);
+  // Apply filters and sorting
+  const sortedRequests = useMemo(() => {
+    return filters.applyFilters(decoratedRequests);
+  }, [decoratedRequests, filters]);
 
-  const deselectAll = useCallback(() => {
-    setSelectedIds(new Set());
-  }, []);
-
+  // Bulk approval
   const bulkApprove = useCallback(async (trustLevel?: TrustLevel): Promise<{ approved: number; failed: number }> => {
-    if (selectedIds.size === 0) return { approved: 0, failed: 0 };
+    if (selection.selectedIds.size === 0) return { approved: 0, failed: 0 };
 
-    const toApprove = Array.from(selectedIds);
+    const toApprove = Array.from(selection.selectedIds);
     const needPassword = toApprove.filter(id => {
       const req = requests.find(r => r.id === id);
       return req?.requiresPassword && (!passwords[id] || !passwords[id].trim());
@@ -362,11 +333,15 @@ export function useRequests(): UseRequestsResult {
     }
 
     setBulkApproving(false);
-    setSelectedIds(new Set());
-    setSelectionMode(false);
+    selection.clearSelection();
 
     return { approved, failed };
-  }, [selectedIds, requests, passwords, approve]);
+  }, [selection, requests, passwords, approve]);
+
+  // Wrapper for selectAll that uses current sorted requests
+  const selectAll = useCallback(() => {
+    selection.selectAll(sortedRequests);
+  }, [selection, sortedRequests]);
 
   return {
     requests: sortedRequests,
@@ -374,8 +349,8 @@ export function useRequests(): UseRequestsResult {
     loadingMore,
     error,
     hasMore,
-    filter,
-    setFilter,
+    filter: filters.filter,
+    setFilter: filters.setFilter,
     passwords,
     setPassword,
     meta,
@@ -383,16 +358,16 @@ export function useRequests(): UseRequestsResult {
     deny,
     loadMore,
     refresh,
-    searchQuery,
-    setSearchQuery,
-    sortBy,
-    setSortBy,
-    selectionMode,
-    toggleSelectionMode,
-    selectedIds,
-    toggleSelection,
+    searchQuery: filters.searchQuery,
+    setSearchQuery: filters.setSearchQuery,
+    sortBy: filters.sortBy,
+    setSortBy: filters.setSortBy,
+    selectionMode: selection.selectionMode,
+    toggleSelectionMode: selection.toggleSelectionMode,
+    selectedIds: selection.selectedIds,
+    toggleSelection: selection.toggleSelection,
     selectAll,
-    deselectAll,
+    deselectAll: selection.deselectAll,
     bulkApprove,
     bulkApproving,
   };

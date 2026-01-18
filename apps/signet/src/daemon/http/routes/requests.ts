@@ -7,7 +7,8 @@ import prisma from '../../../db.js';
 import { grantPermissionsByTrustLevel, permitAllRequests, type AllowScope } from '../../lib/acl.js';
 import { getEventService } from '../../services/event-service.js';
 import { adminLogRepository } from '../../repositories/admin-log-repository.js';
-import { extractEventKind } from '../../repositories/log-repository.js';
+import { extractEventKind } from '../../lib/parse.js';
+import { toErrorMessage } from '../../lib/errors.js';
 import {
     authorizeRequestWebHandler,
     processRequestWebHandler,
@@ -299,7 +300,7 @@ export function registerRequestRoutes(
 
                 results.push({ id, success: true });
             } catch (error) {
-                results.push({ id, success: false, error: (error as Error).message });
+                results.push({ id, success: false, error: toErrorMessage(error) });
             }
         }
 

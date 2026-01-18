@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import type { PendingRequest, ConnectedApp, DashboardStats, KeyInfo, RelayStatusResponse, ActivityEntry, AdminActivityEntry } from '@signet/types';
+import type { PendingRequest, ConnectedApp, DashboardStats, KeyInfo, RelayStatusResponse, ActivityEntry, AdminActivityEntry, LogEntry, HealthStatus } from '@signet/types';
 import type { DeadManSwitchStatus } from '../lib/api-client.js';
 
 /**
@@ -28,6 +28,8 @@ export type ServerEvent =
   | { type: 'deadman:panic'; status: DeadManSwitchStatus }
   | { type: 'deadman:reset'; status: DeadManSwitchStatus }
   | { type: 'deadman:updated'; status: DeadManSwitchStatus }
+  | { type: 'log:entry'; entry: LogEntry }
+  | { type: 'health:updated'; health: HealthStatus }
   | { type: 'ping' };
 
 export type ServerEventCallback = (event: ServerEvent) => void;
@@ -140,6 +142,11 @@ export function useServerEvents(options: UseServerEventsOptions = {}): UseServer
         // Exponential backoff for reconnect
         setReconnecting(true);
         setError('Connection lost. Reconnecting...');
+
+        // Clear any existing reconnect timeout to prevent leaks
+        if (reconnectTimeoutRef.current) {
+          clearTimeout(reconnectTimeoutRef.current);
+        }
 
         reconnectTimeoutRef.current = setTimeout(() => {
           reconnectDelayRef.current = Math.min(

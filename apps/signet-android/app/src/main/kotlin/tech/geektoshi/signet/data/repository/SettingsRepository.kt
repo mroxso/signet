@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -21,6 +22,7 @@ class SettingsRepository(private val context: Context) {
         val BATTERY_PROMPT_SHOWN = booleanPreferencesKey("battery_prompt_shown")
         val APP_LOCK_ENABLED = booleanPreferencesKey("app_lock_enabled")
         val LOCK_TIMEOUT_MINUTES = intPreferencesKey("lock_timeout_minutes")
+        val LAST_ACTIVITY_TIMESTAMP = longPreferencesKey("last_activity_timestamp")
     }
 
     val daemonUrl: Flow<String> = context.dataStore.data.map { preferences ->
@@ -41,6 +43,10 @@ class SettingsRepository(private val context: Context) {
 
     val lockTimeoutMinutes: Flow<Int> = context.dataStore.data.map { preferences ->
         preferences[Keys.LOCK_TIMEOUT_MINUTES] ?: 1
+    }
+
+    val lastActivityTimestamp: Flow<Long> = context.dataStore.data.map { preferences ->
+        preferences[Keys.LAST_ACTIVITY_TIMESTAMP] ?: 0L
     }
 
     suspend fun setDaemonUrl(url: String) {
@@ -70,6 +76,12 @@ class SettingsRepository(private val context: Context) {
     suspend fun setLockTimeoutMinutes(minutes: Int) {
         context.dataStore.edit { preferences ->
             preferences[Keys.LOCK_TIMEOUT_MINUTES] = minutes
+        }
+    }
+
+    suspend fun setLastActivityTimestamp(timestamp: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[Keys.LAST_ACTIVITY_TIMESTAMP] = timestamp
         }
     }
 }

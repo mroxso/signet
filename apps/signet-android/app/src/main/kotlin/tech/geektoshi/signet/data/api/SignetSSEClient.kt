@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import tech.geektoshi.signet.util.NetworkConstants
 import kotlin.coroutines.coroutineContext
 import kotlin.math.min
 
@@ -178,11 +179,6 @@ class SignetSSEClient(
         }
     }
 
-    companion object {
-        private const val INITIAL_RECONNECT_DELAY = 1000L // 1 second
-        private const val MAX_RECONNECT_DELAY = 30000L // 30 seconds
-    }
-
     /**
      * Returns a Flow of ServerEvents. The flow will automatically reconnect
      * with exponential backoff on connection errors.
@@ -190,13 +186,13 @@ class SignetSSEClient(
      * The flow runs until cancelled.
      */
     fun events(): Flow<ServerEvent> = flow {
-        var reconnectDelay = INITIAL_RECONNECT_DELAY
+        var reconnectDelay = NetworkConstants.SSE_INITIAL_RECONNECT_DELAY_MS
 
         while (coroutineContext.isActive) {
             try {
                 client.prepareGet("/events").execute { response ->
                     // Reset reconnect delay on successful connection
-                    reconnectDelay = INITIAL_RECONNECT_DELAY
+                    reconnectDelay = NetworkConstants.SSE_INITIAL_RECONNECT_DELAY_MS
 
                     val channel = response.bodyAsChannel()
 
@@ -223,14 +219,14 @@ class SignetSSEClient(
                 }
             } catch (e: CancellationException) {
                 throw e // Don't catch cancellation
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Connection error - will retry with backoff
             }
 
             // Reconnect with exponential backoff
             if (coroutineContext.isActive) {
                 delay(reconnectDelay)
-                reconnectDelay = min(reconnectDelay * 2, MAX_RECONNECT_DELAY)
+                reconnectDelay = min(reconnectDelay * 2, NetworkConstants.SSE_MAX_RECONNECT_DELAY_MS)
             }
         }
     }

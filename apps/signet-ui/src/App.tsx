@@ -17,6 +17,7 @@ import { AppsPanel } from './components/apps/AppsPanel.js';
 import { ConnectAppModal } from './components/apps/ConnectAppModal.js';
 import { SettingsPanel } from './components/settings/SettingsPanel.js';
 import { HelpPanel } from './components/help/HelpPanel.js';
+import { LogsPanel } from './components/logs/LogsPanel.js';
 import { LockScreen } from './components/shared/LockScreen.js';
 import { useRequests } from './hooks/useRequests.js';
 import { useKeys } from './hooks/useKeys.js';
@@ -38,6 +39,7 @@ function AppContent() {
   const [detailsModalRequest, setDetailsModalRequest] = useState<DisplayRequest | null>(null);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [connectAppModalOpen, setConnectAppModalOpen] = useState(false);
+  const [showCreateKeyForm, setShowCreateKeyForm] = useState(false);
   const [selectedKeyName, setSelectedKeyName] = useState<string | null>(null);
   const [showAutoApproved, setShowAutoApproved] = useState(true);
   const [appNames, setAppNames] = useState<Record<string, string>>({});
@@ -137,6 +139,12 @@ function AppContent() {
     setActiveNav(nav);
   }, []);
 
+  // Handle add key from sidebar
+  const handleAddKey = useCallback(() => {
+    setActiveNav('keys');
+    setShowCreateKeyForm(true);
+  }, []);
+
   // Switch request filter based on active page
   // Home page needs pending requests, Activity page needs processed requests
   useEffect(() => {
@@ -224,7 +232,7 @@ function AppContent() {
             onNavigateToKeys={() => setActiveNav('keys')}
             onNavigateToApps={() => setActiveNav('apps')}
             onToggleShowAutoApproved={() => setShowAutoApproved(prev => !prev)}
-            onLockNow={deadManSwitch.testPanic}
+            onReset={deadManSwitch.reset}
           />
         );
 
@@ -284,8 +292,31 @@ function AppContent() {
               }
               return success;
             }}
+            onSuspendAllApps={async (until?: Date) => {
+              const result = await apps.suspendAllApps(until);
+              if (result.success && result.suspendedCount) {
+                showToast({
+                  message: `Suspended ${result.suspendedCount} app${result.suspendedCount > 1 ? 's' : ''}`,
+                  type: 'success',
+                });
+              }
+              return result;
+            }}
+            onResumeAllApps={async () => {
+              const result = await apps.resumeAllApps();
+              if (result.success && result.resumedCount) {
+                showToast({
+                  message: `Resumed ${result.resumedCount} app${result.resumedCount > 1 ? 's' : ''}`,
+                  type: 'success',
+                });
+              }
+              return result;
+            }}
+            suspendingAll={apps.suspendingAll}
+            resumingAll={apps.resumingAll}
             onClearError={apps.clearError}
             onNavigateToHelp={() => setActiveNav('help')}
+            onOpenConnectModal={() => setConnectAppModalOpen(true)}
           />
         );
 
@@ -335,6 +366,9 @@ function AppContent() {
           />
         );
 
+      case 'logs':
+        return <LogsPanel />;
+
       case 'keys':
         return (
           <KeysPanel
@@ -346,15 +380,34 @@ function AppContent() {
             deleting={keys.deleting}
             unlocking={keys.unlocking}
             locking={keys.locking}
+            lockingAll={keys.lockingAll}
             renaming={keys.renaming}
             settingPassphrase={keys.settingPassphrase}
+            encrypting={keys.encrypting}
+            migrating={keys.migrating}
+            exporting={keys.exporting}
+            forceShowCreateForm={showCreateKeyForm}
             onCreateKey={keys.createKey}
             onDeleteKey={keys.deleteKey}
             onUnlockKey={keys.unlockKey}
             onLockKey={keys.lockKey}
+            onLockAllKeys={async () => {
+              const result = await keys.lockAllKeys();
+              if (result.success && result.lockedCount) {
+                showToast({
+                  message: `Locked ${result.lockedCount} key${result.lockedCount > 1 ? 's' : ''}`,
+                  type: 'success',
+                });
+              }
+              return result;
+            }}
             onRenameKey={keys.renameKey}
             onSetPassphrase={keys.setPassphrase}
+            onEncryptKey={keys.encryptKey}
+            onMigrateKey={keys.migrateKey}
+            onExportKey={keys.exportKey}
             onClearError={keys.clearError}
+            onCreateFormClose={() => setShowCreateKeyForm(false)}
           />
         );
 
@@ -391,6 +444,7 @@ function AppContent() {
       onLockKey={keys.lockKey}
       onUnlockKey={keys.unlockKey}
       onConnectApp={() => setConnectAppModalOpen(true)}
+      onAddKey={handleAddKey}
     >
       {renderContent()}
 

@@ -1,4 +1,5 @@
 export type {
+    EncryptionFormat,
     StoredKey,
     AdminConfig,
     NostrConfig,

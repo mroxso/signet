@@ -5,12 +5,25 @@ import { encrypt as nip44Encrypt, decrypt as nip44Decrypt, getConversationKey } 
 import { encrypt as nip04Encrypt, decrypt as nip04Decrypt } from 'nostr-tools/nip04';
 import createDebug from 'debug';
 import { bytesToHex } from './lib/hex.js';
+import { toErrorMessage } from './lib/errors.js';
+import { logger } from './lib/logger.js';
+import { TTLCache } from './lib/ttl-cache.js';
 import prisma from '../db.js';
 import type { RelayPool } from './lib/relay-pool.js';
 import type { SubscriptionManager } from './lib/subscription-manager.js';
 import { getConnectionTokenService } from './services/index.js';
 
 const debug = createDebug('signet:nip46');
+
+// Deduplication cache: track processed event IDs to avoid reprocessing
+// Events can be delivered multiple times (relay reconnect, subscription refresh)
+// TTL of 10 minutes covers typical health check cycles with margin
+const PROCESSED_EVENTS_TTL_MS = 10 * 60 * 1000;
+const PROCESSED_EVENTS_MAX_SIZE = 5000;
+const processedEvents = new TTLCache<true>('nip46-processed-events', {
+    ttlMs: PROCESSED_EVENTS_TTL_MS,
+    maxSize: PROCESSED_EVENTS_MAX_SIZE,
+});
 
 type Nip46Method =
     | 'connect'
@@ -85,12 +98,12 @@ export class Nip46Backend {
      */
     public start(): void {
         if (this.isRunning) {
-            console.log(`[${this.keyName}] Backend already running, ignoring duplicate start()`);
+            logger.warn('Backend already running', { key: this.keyName });
             return;
         }
 
         const npub = npubEncode(this.pubkey);
-        console.log(`[${this.keyName}] Starting NIP-46 backend for ${npub}`);
+        logger.info('Starting NIP-46 backend', { key: this.keyName, npub });
 
         const subscriptionId = `nip46-${this.keyName}`;
         const filter = {
@@ -99,7 +112,7 @@ export class Nip46Backend {
         };
         const onEvent = (event: Event) => {
             this.handleEvent(event).catch((err) => {
-                console.error(`[${this.keyName}] Error handling event:`, err);
+                logger.error('Error handling event', { key: this.keyName, error: toErrorMessage(err) });
             });
         };
 
@@ -114,7 +127,7 @@ export class Nip46Backend {
         }
 
         this.isRunning = true;
-        console.log(`[${this.keyName}] NIP-46 subscription active`);
+        logger.info('NIP-46 subscription active', { key: this.keyName });
     }
 
     /**
@@ -125,7 +138,7 @@ export class Nip46Backend {
             return;
         }
 
-        console.log(`[${this.keyName}] Stopping NIP-46 backend`);
+        logger.info('Stopping NIP-46 backend', { key: this.keyName });
 
         // Clean up main subscription
         this.unsubscribe?.();
@@ -178,14 +191,14 @@ export class Nip46Backend {
             '#p': [this.pubkey],
         };
 
-        console.log(`[${this.keyName}] Creating subscription for app ${appId} on ${uniqueRelays.length} custom relay(s)`);
+        logger.info('Creating app subscription', { key: this.keyName, appId, relayCount: uniqueRelays.length });
 
         const cleanup = this.subscriptionManager.subscribe(
             subscriptionId,
             filter,
             (event) => {
                 this.handleEvent(event).catch((err) => {
-                    console.error(`[${this.keyName}] Error handling event from app relay:`, err);
+                    logger.error('Error handling event from app relay', { key: this.keyName, error: toErrorMessage(err) });
                 });
             },
             uniqueRelays
@@ -207,7 +220,7 @@ export class Nip46Backend {
             debug('[%s] removing app subscription %d', this.keyName, appId);
             cleanup();
             this.appSubscriptions.delete(appId);
-            console.log(`[${this.keyName}] Removed subscription for app ${appId}`);
+            logger.info('Removed app subscription', { key: this.keyName, appId });
         }
     }
 
@@ -215,11 +228,22 @@ export class Nip46Backend {
      * Handle an incoming NIP-46 request event.
      */
     private async handleEvent(event: Event): Promise<void> {
+        // Deduplicate: skip events we've already processed
+        // This happens when subscriptions are refreshed (health checks) and relays
+        // redeliver historical events
+        if (processedEvents.has(event.id)) {
+            debug('[%s] skipping duplicate event %s', this.keyName, event.id.slice(0, 8));
+            return;
+        }
+
         // Verify signature
         if (!verifyEvent(event)) {
             debug('[%s] invalid signature, ignoring', this.keyName);
             return;
         }
+
+        // Mark as processed BEFORE we handle it to prevent concurrent duplicates
+        processedEvents.set(event.id, true);
 
         // Decrypt and parse request
         const request = this.decryptRequest(event);
@@ -232,7 +256,7 @@ export class Nip46Backend {
 
         const humanPubkey = npubEncode(remotePubkey);
         debug('[%s] request %s: %s from %s', this.keyName, id, method, humanPubkey);
-        console.log(`[${this.keyName}] Request ${id}: ${method} from ${humanPubkey}`);
+        logger.info('NIP-46 request', { key: this.keyName, requestId: id, method, from: humanPubkey });
 
         try {
             const result = await this.handleMethod(id, method, params, remotePubkey);
@@ -243,8 +267,8 @@ export class Nip46Backend {
                 await this.sendError(id, remotePubkey, 'Not authorized');
             }
         } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            console.error(`[${this.keyName}] Error handling ${method}:`, message);
+            const message = toErrorMessage(err);
+            logger.error('Error handling NIP-46 method', { key: this.keyName, method, error: message });
             await this.sendError(id, remotePubkey, message);
         }
     }
@@ -358,7 +382,7 @@ export class Nip46Backend {
 
         // All connect requests go through the normal approval flow
         // This allows the user to see the request and select a trust level
-        console.log(`[${this.keyName}] Connect from ${humanPubkey}, requesting approval`);
+        logger.info('Connect request, awaiting approval', { key: this.keyName, from: humanPubkey });
         const permitted = await this.permitCallback({
             id,
             method: 'connect',
